@@ -1,0 +1,36 @@
+# systemd 服务模板（Debian 13 / ECS 常驻运行）。
+# 用法：
+#   1) 代码放到 /opt/ugame-dashboard，建专用用户：
+#        sudo useradd --system --no-create-home --shell /usr/sbin/nologin ugame
+#        sudo chown -R ugame:ugame /opt/ugame-dashboard
+#   2) 建虚拟环境装 oss2（Debian 13 系统 pip 被锁，必须用 venv）：
+#        sudo -u ugame python3 -m venv /opt/ugame-dashboard/.venv
+#        sudo -u ugame /opt/ugame-dashboard/.venv/bin/pip install -r /opt/ugame-dashboard/requirements.txt
+#   3) 按 .env.example 填好 /opt/ugame-dashboard/.env（chmod 600）
+#   4) sudo cp ugame-dashboard.service /etc/systemd/system/
+#      sudo systemctl daemon-reload && sudo systemctl enable --now ugame-dashboard
+#   5) journalctl -u ugame-dashboard -f   查看日志
+[Unit]
+Description=U.Game 运营数据看板
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ugame
+Group=ugame
+WorkingDirectory=/opt/ugame-dashboard
+# 用 venv 里的 python（Debian 13 不能用系统 pip 装 oss2）
+ExecStart=/opt/ugame-dashboard/.venv/bin/python /opt/ugame-dashboard/server.py 8000
+Restart=always
+RestartSec=3
+# 数据源走 OSS：凭证写在 .env（建议 chmod 600，仅 ugame 可读）
+EnvironmentFile=/opt/ugame-dashboard/.env
+# —— 加固（可选）——
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

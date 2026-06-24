@@ -1,0 +1,18 @@
+# OS / editor noise
+.DS_Store
+**/.DS_Store
+.~lock.*#
+
+# Claude Code local config
+.claude/
+
+# Python
+__pycache__/
+*.pyc
+Dashboard/.venv/
+
+# Secrets / runtime config (never commit OSS credentials)
+Dashboard/.env
+
+# Uploaded raw data (大体量原始数据走 OSS / 本地上传，不入库)
+Dashboard/raw-data/*.csv

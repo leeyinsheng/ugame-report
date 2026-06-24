@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>U.Game 运营数据看板</title>
+<style>
+  :root{--blue:#1f3864;--blue2:#2f5496;--accent:#2f5496;--bg:#f4f6fa;--card:#fff;--line:#e6eaf0;--muted:#8a94a6;--green:#1a9e6a;--red:#d6455d;--txt:#1d2433;}
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;background:var(--bg);color:var(--txt);font-size:15px;line-height:1.4;}
+  .wrap{max-width:520px;margin:0 auto;padding:0 14px 40px;}
+  header{position:sticky;top:0;z-index:10;background:linear-gradient(135deg,var(--blue),var(--blue2));color:#fff;margin:0 -14px 14px;padding:16px 18px 14px;border-radius:0 0 18px 18px;box-shadow:0 4px 16px rgba(31,56,100,.18);}
+  header h1{margin:0;font-size:18px;font-weight:700;letter-spacing:.5px;display:flex;align-items:center;justify-content:space-between;}
+  header h1 .rfs{font-size:12px;font-weight:600;opacity:.85;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);color:#fff;border-radius:10px;padding:5px 10px;cursor:pointer;}
+  header .sub{font-size:12px;opacity:.85;margin-top:3px;}
+  .datenav{display:flex;align-items:center;gap:8px;padding:13px 0 3px;}
+  .navbtn{flex:0 0 auto;width:36px;height:38px;border-radius:12px;border:1px solid rgba(255,255,255,.3);background:rgba(255,255,255,.15);color:#fff;font-size:22px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;}
+  .navbtn:disabled{opacity:.3;}
+  .datewrap{flex:1;position:relative;}
+  .datesel{width:100%;height:38px;border-radius:12px;border:none;background:#fff;color:var(--blue);font-size:15px;font-weight:700;text-align:center;text-align-last:center;padding:0 26px;-webkit-appearance:none;appearance:none;cursor:pointer;}
+  .datewrap::after{content:"▾";position:absolute;right:11px;top:50%;transform:translateY(-50%);color:var(--blue2);font-size:12px;pointer-events:none;}
+  .latest{flex:0 0 auto;height:38px;padding:0 13px;border-radius:12px;border:1px solid rgba(255,255,255,.35);background:rgba(255,255,255,.15);color:#fff;font-size:13px;font-weight:600;cursor:pointer;}
+  .latest:disabled{opacity:.45;}
+  .kpis{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px;}
+  .kpi{background:var(--card);border-radius:14px;padding:13px 14px;box-shadow:0 2px 10px rgba(31,56,100,.06);}
+  .kpi .lab{font-size:12px;color:var(--muted);}
+  .kpi .val{font-size:20px;font-weight:700;margin-top:4px;letter-spacing:.3px;}
+  .kpi .dlt{font-size:12px;margin-top:3px;font-weight:600;}
+  .up{color:var(--green);} .down{color:var(--red);}
+  .sec{background:var(--card);border-radius:16px;margin-bottom:16px;box-shadow:0 2px 10px rgba(31,56,100,.06);overflow:hidden;}
+  .sec h2{margin:0;font-size:15px;font-weight:700;color:var(--blue);padding:14px 16px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px;}
+  .sec h2 .bar{width:4px;height:16px;background:var(--accent);border-radius:3px;}
+  table{width:100%;border-collapse:collapse;}
+  td{padding:11px 16px;font-size:14px;border-bottom:1px solid var(--line);}
+  tr:last-child td{border-bottom:none;}
+  td.k{color:#46506a;}
+  td.v{text-align:right;font-weight:600;font-variant-numeric:tabular-nums;}
+  td.d{text-align:right;font-size:12px;width:62px;font-weight:600;}
+  .chart-wrap{padding:6px 10px 14px;}
+  .chart-t{font-size:13px;color:#46506a;font-weight:600;padding:12px 16px 2px;display:flex;justify-content:space-between;}
+  .chart-t span{color:var(--blue);font-weight:700;}
+  svg{display:block;width:100%;height:auto;}
+  .note{font-size:11px;color:var(--muted);text-align:center;margin-top:8px;line-height:1.6;}
+  .seg{display:flex;gap:6px;padding:10px 14px 2px;overflow-x:auto;scrollbar-width:none;}
+  .seg::-webkit-scrollbar{display:none;}
+  .seg button{flex:0 0 auto;background:#eef1f7;border:none;border-radius:18px;padding:7px 13px;font-size:12.5px;font-weight:600;color:#46506a;cursor:pointer;}
+  .seg button.on{background:var(--accent);color:#fff;}
+  .rangebar{display:flex;gap:6px;padding:8px 14px 0;justify-content:flex-end;}
+  .rangebar button{flex:0 0 auto;background:transparent;border:1px solid var(--line);border-radius:14px;padding:4px 10px;font-size:11.5px;font-weight:600;color:var(--muted);cursor:pointer;}
+  .rangebar button.on{background:var(--accent);border-color:var(--accent);color:#fff;}
+  .state{text-align:center;color:var(--muted);font-size:14px;padding:60px 20px;line-height:1.8;}
+  .state .spin{width:30px;height:30px;border:3px solid var(--line);border-top-color:var(--accent);border-radius:50%;margin:0 auto 14px;animation:sp 1s linear infinite;}
+  @keyframes sp{to{transform:rotate(360deg);}}
+  .state button{margin-top:14px;background:var(--accent);color:#fff;border:none;border-radius:12px;padding:9px 18px;font-size:14px;font-weight:600;cursor:pointer;}
+  .gamewrap{padding:6px 0;}
+  .grow{display:flex;align-items:center;gap:11px;padding:10px 16px;border-bottom:1px solid var(--line);}
+  .grow:last-child{border-bottom:none;}
+  .grank{flex:0 0 auto;width:22px;height:22px;border-radius:7px;background:#eef1f7;color:#46506a;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;}
+  .grank.r1{background:linear-gradient(135deg,#1f3864,#2f5496);color:#fff;}
+  .grank.r2{background:#cfd6e4;color:#1f3864;} .grank.r3{background:#e3e8f0;color:#1f3864;}
+  .gmid{flex:1;min-width:0;}
+  .gtop{display:flex;justify-content:space-between;align-items:baseline;gap:8px;}
+  .gname{font-size:13.5px;font-weight:600;color:#1d2433;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .gbet{font-size:13.5px;font-weight:700;color:var(--blue);font-variant-numeric:tabular-nums;flex:0 0 auto;}
+  .gbar{height:5px;border-radius:3px;background:#eef1f7;margin:5px 0 3px;overflow:hidden;}
+  .gbar i{display:block;height:100%;border-radius:3px;background:linear-gradient(90deg,var(--blue2),#5a7fc0);}
+  .gsub{display:flex;justify-content:space-between;font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums;}
+  .bkpis{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:12px 14px 4px;}
+  .bkpi{background:var(--bg);border-radius:12px;padding:11px 12px;}
+  .bkpi .lab{font-size:12px;color:var(--muted);}
+  .bkpi .val{font-size:19px;font-weight:700;color:var(--blue);margin-top:3px;font-variant-numeric:tabular-nums;}
+  .bkpi .dlt{font-size:11.5px;font-weight:600;margin-top:2px;font-variant-numeric:tabular-nums;}
+  .basof{font-size:11px;color:#b6bdcc;padding:8px 16px 0;}
+  .bcard{border:1px solid var(--line);border-radius:13px;padding:12px 13px;margin:8px 14px 0;}
+  .bcard:last-child{margin-bottom:4px;}
+  .bhead{display:flex;justify-content:space-between;align-items:center;}
+  .bname{font-size:14px;font-weight:700;color:var(--txt);}
+  .bbadge{font-size:11px;font-weight:700;border-radius:9px;padding:3px 8px;}
+  .bbadge.hi{color:#0f6e56;background:#e1f5ee;} .bbadge.lo{color:#a32d2d;background:#fceaea;}
+  .brow{display:flex;justify-content:space-between;align-items:baseline;margin-top:9px;}
+  .blab{font-size:11px;color:var(--muted);} .bbig{font-size:18px;font-weight:700;color:var(--blue);font-variant-numeric:tabular-nums;}
+  .bsub{text-align:right;font-size:11.5px;color:#46506a;line-height:1.7;font-variant-numeric:tabular-nums;}
+  .bbarwrap{display:flex;align-items:center;gap:8px;margin-top:9px;}
+  .bbar{flex:1;height:6px;border-radius:3px;background:#eef1f7;overflow:hidden;}
+  .bbar i{display:block;height:100%;}
+  .bpct{font-size:11px;font-weight:700;}
+  .bnew{font-size:11px;color:var(--muted);margin-top:8px;padding-top:8px;border-top:1px dashed #eef1f7;font-variant-numeric:tabular-nums;}
+  .bnone{padding:20px 16px;color:var(--muted);font-size:13px;text-align:center;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>U.Game 运营数据看板 <button class="rfs" id="refreshBtn" onclick="reload()">刷新</button></h1>
+    <div class="sub" id="sub">加载中…</div>
+    <div class="datenav" id="datenav" style="display:none">
+      <button class="navbtn" id="prev" onclick="step(-1)">‹</button>
+      <div class="datewrap"><select class="datesel" id="datesel" onchange="setDay(parseInt(this.value))"></select></div>
+      <button class="navbtn" id="next" onclick="step(1)">›</button>
+      <button class="latest" id="latestBtn" onclick="setDay(DAYS.length-1)">最新</button>
+    </div>
+  </header>
+
+  <div id="state" class="state"><div class="spin"></div>正在读取原始数据并聚合…</div>
+
+  <div id="board" style="display:none">
+    <div class="kpis" id="kpis"></div>
+    <div class="sec">
+      <h2><span class="bar"></span>趋势走势</h2>
+      <div class="seg" id="seg"></div>
+      <div class="rangebar" id="rangebar"></div>
+      <div class="chart-t" id="chartT"></div>
+      <div class="chart-wrap"><div id="chart"></div></div>
+    </div>
+    <div class="sec"><h2><span class="bar"></span>核心营收指标</h2><table id="t_rev"></table></div>
+    <div class="sec"><h2><span class="bar"></span>会员指标</h2><table id="t_mem"></table></div>
+    <div class="sec"><h2><span class="bar"></span>充提指标</h2><table id="t_cp"></table></div>
+    <div class="sec"><h2><span class="bar"></span>游戏指标 · 场馆投注 TOP 5</h2><div id="t_game" class="gamewrap"></div></div>
+    <div class="sec"><h2><span class="bar"></span>活动彩金 · 领取情况</h2><div id="t_bonus"></div></div>
+    <div class="note">数据来源：raw-data 后台导出原始数据（注单 / 充提 / 账变 / 会员汇总）<br>注单按派彩结算日、充提按完成时间统计 · GGR=投注−派彩 · NGR=GGR−彩金−实际返水（不含代理佣金）· 毛利率=GGR/有效打码 · 净利率=NGR/有效打码 · 币种 USDT<br><span style="color:#b6bdcc">预计返水来自注单明细、实际返水来自账变记录（NGR 用实际返水）；累计 / 新增注册依据最新会员汇总快照回溯计算</span></div>
+  </div>
+</div>
+
+<script>
+let DATA={}, DAYS=[];
+let cur=0, metricKey="投注总额", rangeN=0;
+const md = d=>d.slice(5);
+const REV=[["投注总额","rev.投注总额","m"],["有效打码","rev.有效打码","m"],["派彩总额","rev.派彩总额","m"],["平台毛利润 GGR","rev.GGR","m"],["彩金费用","rev.彩金","m"],["预计返水（注单）","rev.预计返水","m"],["实际返水（账变）","rev.实际返水","m"],["平台净利润 NGR","rev.NGR","m"],["毛利率","rev.毛利率","p"],["净利率","rev.净利率","p"]];
+const MEM=[["累计注册会员","mem.累计注册","i"],["当日新增注册","mem.新增注册","i"],["当日活跃会员","mem.活跃会员","i"],["当日首充会员","mem.首充会员","i"],["新客首充率","mem.新客首充率","p"],["活跃率","mem.活跃率","p"],["人均投注额","mem.人均投注","m"],["人均充值额","mem.人均充值","m"],["ARPU","mem.ARPU","m"]];
+const CP=[["当日充值总额","cp.充值总额","m"],["充值笔数","cp.充值笔数","i"],["充值人数","cp.充值人数","i"],["当日提现总额","cp.提现总额","m"],["提现笔数","cp.提现笔数","i"],["提现人数","cp.提现人数","i"],["充提差额","cp.充提差额","m"],["充提比率","cp.充提比率","x"]];
+const TRENDS=[["投注总额","rev.投注总额","m"],["平台净利润 NGR","rev.NGR","m"],["活跃会员","mem.活跃会员","i"],["充提差额","cp.充提差额","m"],["毛利率","rev.毛利率","p"]];
+const get=(d,p)=>p.split('.').reduce((o,k)=>o[k],DATA[d]);
+function fmt(v,t){if(v==null||isNaN(v))return '—';if(t==='p')return v.toFixed(2)+'%';if(t==='x')return v.toFixed(2);if(t==='i')return v.toLocaleString('en-US');return v.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});}
+function delta(d,p,t){const i=DAYS.indexOf(d);if(i<=0)return '';const a=get(d,p),b=get(DAYS[i-1],p);if(b===0&&a===0)return '<span style="color:#b6bdcc">—</span>';let txt,cls;if(t==='p'||t==='x'){const df=a-b;cls=df>=0?'up':'down';txt=(df>=0?'▲':'▼')+Math.abs(df).toFixed(2);}else if(b===0){cls='up';txt='▲ 新增';}else{const pc=(a-b)/Math.abs(b)*100;cls=pc>=0?'up':'down';txt=(pc>=0?'▲':'▼')+Math.abs(pc).toFixed(0)+'%';}return `<span class="${cls}">${txt}</span>`;}
+function renderNav(){
+  document.getElementById('datesel').innerHTML=DAYS.map((d,i)=>`<option value="${i}" ${i===cur?'selected':''}>${d}　(${i+1}/${DAYS.length})</option>`).join('');
+  document.getElementById('prev').disabled=cur===0;
+  document.getElementById('next').disabled=cur===DAYS.length-1;
+  document.getElementById('latestBtn').disabled=cur===DAYS.length-1;
+}
+function step(n){const i=Math.min(Math.max(cur+n,0),DAYS.length-1);if(i!==cur)setDay(i);}
+function setDay(i){cur=i;renderNav();renderKPI();renderTables();renderChart();}
+function renderKPI(){const d=DAYS[cur];const items=[["投注总额","rev.投注总额","m"],["平台净利润 NGR","rev.NGR","m"],["当日活跃会员","mem.活跃会员","i"],["充提差额","cp.充提差额","m"]];document.getElementById('kpis').innerHTML=items.map(([lab,p,t])=>{const v=get(d,p),neg=(t==='m'&&v<0);return `<div class="kpi"><div class="lab">${lab}</div><div class="val" style="color:${neg?'var(--red)':'var(--blue)'}">${fmt(v,t)}</div><div class="dlt">${delta(d,p,t)||'<span style="color:#b6bdcc">首日</span>'}</div></div>`;}).join('');}
+function tbl(id,cfg){const d=DAYS[cur];document.getElementById(id).innerHTML=cfg.map(([n,p,t])=>{const v=get(d,p),neg=(t==='m'&&v<0);return `<tr><td class="k">${n}</td><td class="v" style="color:${neg?'var(--red)':'inherit'}">${fmt(v,t)}</td><td class="d">${delta(d,p,t)}</td></tr>`;}).join('');}
+function renderTables(){tbl('t_rev',REV);tbl('t_mem',MEM);tbl('t_cp',CP);renderGame();renderBonus();}
+function renderBonus(){
+  const b=(DATA[DAYS[cur]]||{}).bonus;
+  const box=document.getElementById('t_bonus');
+  if(!b||!b.list||!b.list.length){box.innerHTML='<div class="bnone">当日暂无活动数据</div>';return;}
+  const s=b.summary, sel=DAYS[cur];
+  const asof=(b.as_of&&b.as_of!==sel)?`<div class="basof">注：该日无活动文件，显示截至 ${md(b.as_of)} 的累计</div>`:'';
+  let html=asof+`<div class="bkpis">`+
+    `<div class="bkpi"><div class="lab">到帐彩金 · 累计</div><div class="val">${fmt(s['累计到帐彩金'],'m')}</div><div class="dlt up">当日 +${fmt(s['当日新增到帐彩金'],'m')}</div></div>`+
+    `<div class="bkpi"><div class="lab">整体兑现率</div><div class="val">${s['整体兑现率'].toFixed(2)}%</div><div class="dlt" style="color:var(--muted)">领取会员 ${s['领取会员']} 人</div></div>`+
+    `</div>`;
+  html+=b.list.map(it=>{
+    const hi=it['领取率']>=50, col=it['兑现率']>=50?'var(--green)':'var(--red)';
+    const dv=it['当日新增到帐'], dn=it['当日新增次数'];
+    const w=Math.min(Math.max(it['兑现率'],0.6),100);
+    return `<div class="bcard"><div class="bhead"><span class="bname">${it['活动']}</span>`+
+      `<span class="bbadge ${hi?'hi':'lo'}">领取率 ${it['领取率'].toFixed(2)}%</span></div>`+
+      `<div class="brow"><div><div class="blab">到帐彩金</div><div class="bbig">${fmt(it['到帐彩金'],'m')}</div></div>`+
+      `<div class="bsub">触发彩金 <b>${fmt(it['触发彩金'],'m')}</b><br>领取/触发 <b>${it['领取人数']} / ${it['触发人数']} 人</b> · ${it['触发次数'].toLocaleString('en-US')} 次</div></div>`+
+      `<div class="bbarwrap"><div class="bbar"><i style="width:${w}%;background:${col}"></i></div><span class="bpct" style="color:${col}">兑现率 ${it['兑现率'].toFixed(it['兑现率']<10?2:0)}%</span></div>`+
+      `<div class="bnew">当日新增 到帐 <b style="color:${dv>0?'var(--green)':'inherit'}">${dv>0?'+':''}${fmt(dv,'m')}</b> · 触发 +${dn.toLocaleString('en-US')} 次</div>`+
+      `</div>`;
+  }).join('');
+  box.innerHTML=html;
+}
+function renderGame(){
+  const list=(DATA[DAYS[cur]]||{}).game||[];
+  const box=document.getElementById('t_game');
+  if(!list.length){box.innerHTML='<div style="padding:20px 16px;color:#8a94a6;font-size:13px;text-align:center">当日暂无注单数据</div>';return;}
+  const mx=Math.max(...list.map(g=>g['投注总额']),1);
+  box.innerHTML=list.map((g,i)=>{
+    const w=Math.max(g['投注总额']/mx*100,2);
+    const pl=g['平台输赢'],plc=pl>=0?'up':'down';
+    return `<div class="grow"><span class="grank r${i+1}">${i+1}</span><div class="gmid">`+
+      `<div class="gtop"><span class="gname">${g['场馆']}</span><span class="gbet">${fmt(g['投注总额'],'m')}</span></div>`+
+      `<div class="gbar"><i style="width:${w}%"></i></div>`+
+      `<div class="gsub"><span>占比 ${g['占比'].toFixed(2)}%</span><span class="${plc}">平台${pl>=0?'+':'−'}${fmt(Math.abs(pl),'m')}</span></div>`+
+      `</div></div>`;
+  }).join('');
+}
+function renderSeg(){document.getElementById('seg').innerHTML=TRENDS.map(([n])=>`<button class="${n===metricKey?'on':''}" onclick="setMetric('${n}')">${n}</button>`).join('');}
+function setMetric(n){metricKey=n;renderSeg();renderChart();}
+function renderRange(){
+  const opts=[["全部",0],["近30",30],["近14",14],["近7",7]].filter(([l,n])=>n===0||n<DAYS.length);
+  const bar=document.getElementById('rangebar');
+  if(opts.length<=1){bar.style.display='none';return;}
+  bar.style.display='flex';
+  bar.innerHTML=opts.map(([l,n])=>`<button class="${n===rangeN?'on':''}" onclick="setRange(${n})">${l}</button>`).join('');
+}
+function setRange(n){rangeN=n;renderRange();renderChart();}
+function renderChart(){
+  const cfg=TRENDS.find(t=>t[0]===metricKey),path=cfg[1],t=cfg[2];
+  const start=rangeN>0?Math.max(0,DAYS.length-rangeN):0;
+  const view=DAYS.slice(start);const vals=view.map(d=>get(d,path));
+  const W=480,H=190,pl=10,pr=10,pt=26,pb=28;let mn=Math.min(...vals,0),mx=Math.max(...vals,0);if(mn===mx)mx=mn+1;
+  const N=view.length;const sx=i=>pl+(W-pl-pr)*(N===1?0.5:i/(N-1));const sy=v=>pt+(H-pt-pb)*(1-(v-mn)/(mx-mn));const zeroY=sy(0);
+  const stp=N>9?Math.ceil(N/6):1;const curLocal=cur-start;
+  let pts=vals.map((v,i)=>`${sx(i)},${sy(v)}`).join(' ');
+  let area=`${sx(0)},${zeroY} `+pts+` ${sx(N-1)},${zeroY}`;
+  let dots=vals.map((v,i)=>{const on=i===curLocal,neg=v<0;return `<circle cx="${sx(i)}" cy="${sy(v)}" r="${on?5:3}" fill="${on?'#fff':(neg?'#d6455d':'#2f5496')}" stroke="${neg?'#d6455d':'#2f5496'}" stroke-width="${on?3:1.3}"/>`+(on?`<text x="${Math.min(Math.max(sx(i),34),W-34)}" y="${sy(v)-12}" text-anchor="middle" font-size="12" font-weight="700" fill="${neg?'#d6455d':'#1f3864'}">${fmt(v,t)}</text>`:'');}).join('');
+  let labs=view.map((d,i)=>{const show=(i%stp===0)||i===curLocal||i===N-1;if(!show)return '';return `<text x="${sx(i)}" y="${H-8}" text-anchor="middle" font-size="10" fill="${i===curLocal?'#1f3864':'#8a94a6'}" font-weight="${i===curLocal?'700':'400'}">${md(d)}</text>`;}).join('');
+  const zline=(mn<0&&mx>0)?`<line x1="${pl}" y1="${zeroY}" x2="${W-pr}" y2="${zeroY}" stroke="#cfd6e4" stroke-dasharray="3 3" stroke-width="1"/>`:'';
+  document.getElementById('chart').innerHTML=`<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet"><defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2f5496" stop-opacity=".18"/><stop offset="1" stop-color="#2f5496" stop-opacity="0"/></linearGradient></defs><polygon points="${area}" fill="url(#g)"/>${zline}<polyline points="${pts}" fill="none" stroke="#2f5496" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/>${dots}${labs}</svg>`;
+  document.getElementById('chartT').innerHTML=`${metricKey} 走势 <span>${fmt(get(DAYS[cur],path),t)}</span>`;
+}
+function showState(html){document.getElementById('state').style.display='block';document.getElementById('state').innerHTML=html;document.getElementById('board').style.display='none';document.getElementById('datenav').style.display='none';}
+function render(){
+  document.getElementById('state').style.display='none';
+  document.getElementById('board').style.display='block';
+  document.getElementById('datenav').style.display='flex';
+  document.getElementById('sub').textContent=`核心营收 · 会员 · 充提　|　${md(DAYS[0])} 至 ${md(DAYS[DAYS.length-1])} · 共 ${DAYS.length} 天`;
+  renderNav();renderKPI();renderSeg();renderRange();renderTables();renderChart();
+}
+async function reload(){
+  showState('<div class="spin"></div>正在读取原始数据并聚合…');
+  document.getElementById('sub').textContent='加载中…';
+  try{
+    const r=await fetch('api/summary?t='+Date.now());
+    if(!r.ok)throw new Error('HTTP '+r.status);
+    const d=await r.json();
+    if(d.error)throw new Error(d.error);
+    DAYS=Object.keys(d);
+    if(DAYS.length===0){showState('暂无数据。<br>请将后台导出的 CSV 放入 raw-data 目录后点击刷新。<br><button onclick="reload()">重新加载</button>');document.getElementById('sub').textContent='暂无数据';return;}
+    DATA=d;cur=DAYS.length-1;rangeN=0;
+    render();
+  }catch(e){
+    showState('加载失败：'+e.message+'<br>请确认已通过 server.py 启动服务。<br><button onclick="reload()">重试</button>');
+    document.getElementById('sub').textContent='加载失败';
+  }
+}
+reload();
+</script>
+</body>
+</html>
