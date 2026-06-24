@@ -14,5 +14,5 @@ Dashboard/.venv/
 # Secrets / runtime config (never commit OSS credentials)
 Dashboard/.env
 
-# Uploaded raw data (大体量原始数据走 OSS / 本地上传，不入库)
-Dashboard/raw-data/*.csv
+# Uploaded raw data (大体量原始数据走 OSS / 本地上传，整个目录不入库)
+Dashboard/raw-data/
