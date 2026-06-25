@@ -268,6 +268,9 @@ def aggregate(source):
     def cum_reg(day):
         return sum(n for rd, n in reg_by_day.items() if rd <= day)
 
+    def cum_fc(day):   # 累计充值会员：首充日 <= 当日的会员数
+        return sum(n for fd, n in fc_by_day.items() if fd <= day)
+
     out = {}
     for d in days:
         rv = rev.get(d, [0.0, 0.0, 0.0, 0.0, 0.0, set(), 0.0])
@@ -296,7 +299,7 @@ def aggregate(source):
                 "净利率": safe(ngr * 100, eff_t),
             },
             "mem": {
-                "累计注册": cum, "新增注册": new_reg, "活跃会员": active,
+                "累计注册": cum, "累计充值会员": cum_fc(d), "新增注册": new_reg, "活跃会员": active,
                 "首充会员": first_charge,
                 "新客首充率": safe(first_charge * 100, new_reg),
                 "活跃率": safe(active * 100, cum),
