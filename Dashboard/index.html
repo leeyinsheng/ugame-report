@@ -86,6 +86,33 @@
   .bpct{font-size:11px;font-weight:700;}
   .bnew{font-size:11px;color:var(--muted);margin-top:8px;padding-top:8px;border-top:1px dashed #eef1f7;font-variant-numeric:tabular-nums;}
   .bnone{padding:20px 16px;color:var(--muted);font-size:13px;text-align:center;}
+  .vmetricbar{display:flex;gap:6px;padding:12px 14px 0;}
+  .vmetricbar button{flex:1;background:#eef1f7;border:none;border-radius:14px;padding:8px 0;font-size:13px;font-weight:600;color:#46506a;cursor:pointer;}
+  .vmetricbar button.on{background:var(--accent);color:#fff;}
+  .vrangebar{display:flex;gap:6px;padding:8px 14px 0;justify-content:flex-end;}
+  .vrangebar button{flex:0 0 auto;background:transparent;border:1px solid var(--line);border-radius:14px;padding:4px 10px;font-size:11.5px;font-weight:600;color:var(--muted);cursor:pointer;}
+  .vrangebar button.on{background:var(--accent);border-color:var(--accent);color:#fff;}
+  .vselwrap{padding:10px 14px 4px;}
+  .vsel{display:flex;gap:7px;overflow-x:auto;scrollbar-width:none;padding-bottom:2px;}
+  .vsel::-webkit-scrollbar{display:none;}
+  .vchip{flex:0 0 auto;display:flex;align-items:center;gap:5px;border-radius:18px;padding:7px 12px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;border:1px solid var(--line);background:#f8f9fc;color:#46506a;}
+  .vchip.on{background:var(--accent);border-color:var(--accent);color:#fff;}
+  .vchip .ck{width:14px;height:14px;border-radius:50%;border:1.5px solid currentColor;display:flex;align-items:center;justify-content:center;font-size:9px;}
+  .vchip.on .ck{background:#fff;color:var(--accent);}
+  .vnotice{padding:0 16px;font-size:11px;color:var(--red);min-height:18px;}
+  .vchart-t{font-size:13px;color:#46506a;font-weight:600;padding:10px 16px 2px;display:flex;justify-content:space-between;}
+  .vchart-t span{color:var(--blue);font-weight:700;}
+  .vlegend{display:flex;flex-wrap:wrap;gap:8px;padding:2px 16px 10px;}
+  .vleg{display:flex;align-items:center;gap:5px;font-size:11px;color:#46506a;}
+  .vleg i{width:10px;height:10px;border-radius:50%;}
+  .vtablewrap{padding:0 14px 12px;}
+  .vtablewrap table{font-size:13px;}
+  .vtablewrap td{padding:9px 8px;border-bottom:1px solid var(--line);}
+  .vtablewrap tr:last-child td{border-bottom:none;}
+  .vtablewrap td.vn{font-weight:600;display:flex;align-items:center;gap:6px;}
+  .vtablewrap td.vn i{width:8px;height:8px;border-radius:50%;}
+  .vtablewrap td.vv{text-align:right;font-weight:700;font-variant-numeric:tabular-nums;}
+  .vtablewrap td.vd{text-align:right;font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums;}
 </style>
 </head>
 <body>
@@ -106,11 +133,22 @@
   <div id="board" style="display:none">
     <div class="kpis" id="kpis"></div>
     <div class="sec">
-      <h2><span class="bar"></span>趋势走势</h2>
+      <h2><span class="bar"></span>营收走势</h2>
       <div class="seg" id="seg"></div>
       <div class="rangebar" id="rangebar"></div>
       <div class="chart-t" id="chartT"></div>
       <div class="chart-wrap"><div id="chart"></div></div>
+    </div>
+    <div class="sec">
+      <h2><span class="bar"></span>游戏场馆走势</h2>
+      <div class="vmetricbar" id="vmetricbar"></div>
+      <div class="vrangebar" id="vrangebar"></div>
+      <div class="vselwrap"><div class="vsel" id="vsel"></div></div>
+      <div class="vnotice" id="vnotice"></div>
+      <div class="vchart-t" id="vchartT"></div>
+      <div class="chart-wrap"><div id="vchart"></div></div>
+      <div class="vlegend" id="vlegend"></div>
+      <div class="vtablewrap"><table id="vtable"></table></div>
     </div>
     <div class="sec"><h2><span class="bar"></span>核心营收指标</h2><table id="t_rev"></table></div>
     <div class="sec"><h2><span class="bar"></span>会员指标</h2><table id="t_mem"></table></div>
@@ -139,7 +177,7 @@ function renderNav(){
   document.getElementById('latestBtn').disabled=cur===DAYS.length-1;
 }
 function step(n){const i=Math.min(Math.max(cur+n,0),DAYS.length-1);if(i!==cur)setDay(i);}
-function setDay(i){cur=i;renderNav();renderKPI();renderTables();renderChart();}
+function setDay(i){cur=i;renderNav();renderKPI();renderTables();renderChart();renderVenueTrends();}
 function renderKPI(){const d=DAYS[cur];const items=[["投注总额","rev.投注总额","m"],["平台净利润 NGR","rev.NGR","m"],["当日活跃会员","mem.活跃会员","i"],["充提差额","cp.充提差额","m"]];document.getElementById('kpis').innerHTML=items.map(([lab,p,t])=>{const v=get(d,p),neg=(t==='m'&&v<0);return `<div class="kpi"><div class="lab">${lab}</div><div class="val" style="color:${neg?'var(--red)':'var(--blue)'}">${fmt(v,t)}</div><div class="dlt">${delta(d,p,t)||'<span style="color:#b6bdcc">首日</span>'}</div></div>`;}).join('');}
 function tbl(id,cfg){const d=DAYS[cur];document.getElementById(id).innerHTML=cfg.map(([n,p,t])=>{const v=get(d,p),neg=(t==='m'&&v<0);return `<tr><td class="k">${n}</td><td class="v" style="color:${neg?'var(--red)':'inherit'}">${fmt(v,t)}</td><td class="d">${delta(d,p,t)}</td></tr>`;}).join('');}
 function renderTables(){tbl('t_rev',REV);tbl('t_mem',MEM);tbl('t_cp',CP);renderGame();renderBonus();}
@@ -182,6 +220,54 @@ function renderGame(){
       `</div></div>`;
   }).join('');
 }
+let venueMetric='打码',venueRange=0,selectedVenues=new Set(),venueDefaultsSet=false;
+const VENUE_METRICS=[['打码','有效打码','m'],['平台输赢','平台输赢','m'],['注单量','注单量','i']];
+const VENUE_COLORS=['#2f5496','#1a9e6a','#7c3aed','#f59e0b','#0891b2','#4b5563','#9ca3af','#d6455d','#06b6d4','#84cc16'];
+function allVenues(){const s=new Set();DAYS.forEach(d=>Object.keys((DATA[d]||{}).venue_trends||{}).forEach(v=>s.add(v)));return Array.from(s).sort();}
+function venueColor(name){const i=allVenues().indexOf(name);return VENUE_COLORS[Math.max(i,0)%VENUE_COLORS.length];}
+function getVenueList(){const curDay=DAYS[cur]||'';const trends=(DATA[curDay]||{}).venue_trends||{};return allVenues().sort((a,b)=>{const sa=selectedVenues.has(a),sb=selectedVenues.has(b);if(sa!==sb)return sa?-1:1;const va=(trends[a]||{})['有效打码']||0,vb=(trends[b]||{})['有效打码']||0;return vb-va||a.localeCompare(b);});}
+function ensureDefaultVenues(list){if(!venueDefaultsSet&&list.length>0){list.slice(0,3).forEach(v=>selectedVenues.add(v));venueDefaultsSet=true;}}
+function showVenueNotice(msg){document.getElementById('vnotice').textContent=msg||'';}
+function renderVenueMetrics(){document.getElementById('vmetricbar').innerHTML=VENUE_METRICS.map(([n])=>`<button class="${n===venueMetric?'on':''}" onclick="setVenueMetric('${n}')">${n}</button>`).join('');}
+function setVenueMetric(n){venueMetric=n;renderVenueMetrics();renderVenueChart();renderVenueLegend();renderVenueTable();}
+function renderVenueRange(){const opts=[["全部",0],["近30",30],["近14",14],["近7",7]].filter(([l,n])=>n===0||n<DAYS.length);document.getElementById('vrangebar').innerHTML=opts.map(([l,n])=>`<button class="${n===venueRange?'on':''}" onclick="setVenueRange(${n})">${l}</button>`).join('');}
+function setVenueRange(n){venueRange=n;renderVenueRange();renderVenueChart();}
+function renderVenueSelector(){const list=getVenueList();ensureDefaultVenues(list);document.getElementById('vsel').innerHTML=list.map(name=>{const on=selectedVenues.has(name);return `<div class="vchip ${on?'on':''}" onclick="toggleVenue('${name}')"><span class="ck">${on?'✓':''}</span>${name}</div>`;}).join('');}
+function toggleVenue(name){if(selectedVenues.has(name)){selectedVenues.delete(name);showVenueNotice('');}else{if(selectedVenues.size>=5){showVenueNotice('最多同时对比 5 个场馆');return;}selectedVenues.add(name);showVenueNotice('');}renderVenueSelector();renderVenueChart();renderVenueLegend();renderVenueTable();}
+function renderVenueLegend(){const sel=Array.from(selectedVenues).sort((a,b)=>a.localeCompare(b));document.getElementById('vlegend').innerHTML=sel.map(name=>`<div class="vleg"><i style="background:${venueColor(name)}"></i>${name}</div>`).join('');}
+function renderVenueChart(){
+  const start=venueRange>0?Math.max(0,DAYS.length-venueRange):0;const view=DAYS.slice(start);
+  const sel=Array.from(selectedVenues).sort((a,b)=>a.localeCompare(b));
+  const cfg=VENUE_METRICS.find(m=>m[0]===venueMetric),key=cfg[1],type=cfg[2];
+  if(!sel.length){document.getElementById('vchart').innerHTML='<div class="bnone">请选择场馆查看走势</div>';document.getElementById('vchartT').innerHTML=venueMetric+' 走势 <span>—</span>';return;}
+  const series=sel.map(name=>{const vals=view.map(d=>(DATA[d].venue_trends||{})[name]?.[key]??0);return{name,vals,color:venueColor(name)};});
+  const allVals=series.flatMap(s=>s.vals);let mn=Math.min(...allVals,0),mx=Math.max(...allVals,0);if(mn===mx)mx=mn+1;
+  const W=480,H=180,pl=10,pr=10,pt=22,pb=28,N=view.length;
+  const sx=i=>pl+(W-pl-pr)*(N===1?0.5:i/(N-1));const sy=v=>pt+(H-pt-pb)*(1-(v-mn)/(mx-mn));const zeroY=sy(0);
+  const curLocal=cur-start;const stp=N>9?Math.ceil(N/6):1;
+  let lines='',dots='';
+  series.forEach(s=>{const pts=s.vals.map((v,i)=>`${sx(i)},${sy(v)}`).join(' ');lines+=`<polyline points="${pts}" fill="none" stroke="${s.color}" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/>`;dots+=s.vals.map((v,i)=>{const on=i===curLocal;return `<circle cx="${sx(i)}" cy="${sy(v)}" r="${on?5:3}" fill="${on?'#fff':s.color}" stroke="${s.color}" stroke-width="${on?3:1.3}"/>`;}).join('');});
+  let labels='';
+  if(curLocal>=0&&curLocal<N){
+    series.forEach((s,idx)=>{const v=s.vals[curLocal];const x=sx(curLocal);const y=sy(v);const offset=(idx-(series.length-1)/2)*14;labels+=`<text x="${Math.min(Math.max(x,40),W-40)}" y="${Math.max(y+offset-12,14)}" text-anchor="middle" font-size="10" font-weight="700" fill="${s.color}">${fmt(v,type)}</text>`;});
+  }
+  const labs=view.map((d,i)=>{const show=(i%stp===0)||i===curLocal||i===N-1;if(!show)return'';return `<text x="${sx(i)}" y="${H-8}" text-anchor="middle" font-size="10" fill="${i===curLocal?'#1f3864':'#8a94a6'}" font-weight="${i===curLocal?'700':'400'}">${md(d)}</text>`;}).join('');
+  const zline=(venueMetric==='平台输赢'&&mn<0&&mx>0)?`<line x1="${pl}" y1="${zeroY}" x2="${W-pr}" y2="${zeroY}" stroke="#cfd6e4" stroke-dasharray="3 3" stroke-width="1"/>`:'';
+  document.getElementById('vchart').innerHTML=`<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet">${zline}${lines}${dots}${labels}${labs}</svg>`;
+  document.getElementById('vchartT').innerHTML=venueMetric+' 走势 <span></span>';
+}
+function renderVenueTable(){
+  const d=DAYS[cur];const trends=(DATA[d]||{}).venue_trends||{};const sel=Array.from(selectedVenues).sort((a,b)=>a.localeCompare(b));
+  const cfg=VENUE_METRICS.find(m=>m[0]===venueMetric),key=cfg[1],type=cfg[2];
+  const rows=sel.map(name=>{const v=trends[name]?.[key]??0;const prev=cur>0?(DATA[DAYS[cur-1]]?.venue_trends||{})[name]?.[key]:null;return{name,v,prev,color:venueColor(name)};}).sort((a,b)=>b.v-a.v);
+  const html=rows.map(r=>{
+    const isPl=venueMetric==='平台输赢';let valStyle='';if(isPl&&r.v<0)valStyle='color:var(--red)';else if(isPl&&r.v>0)valStyle='color:var(--green)';
+    let dlt='';if(r.prev!==null&&r.prev!==undefined){if(r.prev===0&&r.v===0)dlt='—';else if(r.prev===0)dlt='<span class="up">▲ 新增</span>';else{const pc=(r.v-r.prev)/Math.abs(r.prev)*100;dlt=`<span class="${pc>=0?'up':'down'}">${pc>=0?'▲':'▼'}${Math.abs(pc).toFixed(0)}%</span>`;}}
+    return `<tr><td class="vn"><i style="background:${r.color}"></i>${r.name}</td><td class="vv" style="${valStyle}">${fmt(r.v,type)}</td><td class="vd">${dlt}</td></tr>`;
+  }).join('');
+  document.getElementById('vtable').innerHTML=html||'<tr><td colspan="3" style="text-align:center;color:var(--muted);padding:16px;">请选择场馆</td></tr>';
+}
+function renderVenueTrends(){renderVenueMetrics();renderVenueRange();renderVenueSelector();renderVenueLegend();renderVenueChart();renderVenueTable();}
 function renderSeg(){document.getElementById('seg').innerHTML=TRENDS.map(([n])=>`<button class="${n===metricKey?'on':''}" onclick="setMetric('${n}')">${n}</button>`).join('');}
 function setMetric(n){metricKey=n;renderSeg();renderChart();}
 function renderRange(){
@@ -213,7 +299,7 @@ function render(){
   document.getElementById('board').style.display='block';
   document.getElementById('datenav').style.display='flex';
   document.getElementById('sub').textContent=`核心营收 · 会员 · 充提　|　${md(DAYS[0])} 至 ${md(DAYS[DAYS.length-1])} · 共 ${DAYS.length} 天`;
-  renderNav();renderKPI();renderSeg();renderRange();renderTables();renderChart();
+  renderNav();renderKPI();renderSeg();renderRange();renderTables();renderChart();renderVenueTrends();
 }
 async function reload(){
   showState('<div class="spin"></div>正在读取原始数据并聚合…');

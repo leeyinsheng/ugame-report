@@ -213,7 +213,7 @@ def aggregate(source):
     def _cp(d):
         return cp.setdefault(d, [0.0, 0, set(), 0.0, 0, set()])
 
-    game = {}  # 日 -> {游戏场馆: [投注总额, 派彩总额]}
+    game = {}  # 日 -> {游戏场馆: [投注总额, 派彩总额, 有效打码, 注单量]}
 
     for d, mid, bet, eff, payout, est, venue in bets.values():
         if not d:
@@ -222,8 +222,8 @@ def aggregate(source):
         a[0] += bet; a[1] += eff; a[2] += payout
         a[5].add(mid)
         a[6] += est                    # 预计返水（来自注单明细）
-        gv = game.setdefault(d, {}).setdefault(venue_display(venue), [0.0, 0.0])
-        gv[0] += bet; gv[1] += payout
+        gv = game.setdefault(d, {}).setdefault(venue_display(venue), [0.0, 0.0, 0.0, 0])
+        gv[0] += bet; gv[1] += payout; gv[2] += eff; gv[3] += 1
 
     for d, t, amt in ledger.values():
         if not d:
@@ -305,6 +305,7 @@ def aggregate(source):
                 "充提比率": round(dep_t / wd_t, 2) if wd_t else 0.0,
             },
             "game": _top_games(game.get(d, {}), bet_t),
+            "venue_trends": _venue_trends(game.get(d, {})),
             "bonus": _bonus_for(activity_snaps, d),
         }
     return out
@@ -364,11 +365,26 @@ def _bonus_for(snaps, d):
     }
 
 
+def _venue_trends(venues):
+    """返回當日所有場館的完整走勢指標（含有效打碼、注單量、會員輸贏）。"""
+    out = {}
+    for name, (bet, payout, eff, count) in venues.items():
+        out[name] = {
+            "投注总额": round(bet, 2),
+            "派彩总额": round(payout, 2),
+            "有效打码": round(eff, 2),
+            "注单量": int(count),
+            "平台输赢": round(bet - payout, 2),     # 正=平台赢
+            "会员输赢": round(payout - bet, 2),     # 正=会员赢
+        }
+    return out
+
+
 def _top_games(venues, total_bet, n=5):
     """按投注总额取 TOP n 个游戏场馆，附派彩、平台输赢(GGR)、投注占比。"""
     top = sorted(venues.items(), key=lambda kv: kv[1][0], reverse=True)[:n]
     out = []
-    for name, (bet, payout) in top:
+    for name, (bet, payout, eff, count) in top:
         out.append({
             "场馆": name,
             "投注总额": round(bet, 2),
