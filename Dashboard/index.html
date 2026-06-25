@@ -221,7 +221,7 @@ function renderGame(){
   }).join('');
 }
 let venueMetric='打码',venueRange=0,selectedVenues=new Set(),venueDefaultsSet=false;
-const VENUE_METRICS=[['打码','有效打码','m'],['平台输赢','平台输赢','m'],['注单量','注单量','i']];
+const VENUE_METRICS=[['打码','有效打码','m'],['平台输赢','平台输赢','m'],['注单量','注单量','i'],['杀率','杀率','p']];
 const VENUE_COLORS=['#2f5496','#1a9e6a','#e8650c','#d6455d','#7c3aed','#0e9bb5','#d6459b','#7d9b1e','#9c5a3c','#3aa0ff','#e0a500','#475569'];
 function allVenues(){const s=new Set();DAYS.forEach(d=>Object.keys((DATA[d]||{}).venue_trends||{}).forEach(v=>s.add(v)));return Array.from(s).sort();}
 function venueColor(name){const i=allVenues().indexOf(name);return VENUE_COLORS[Math.max(i,0)%VENUE_COLORS.length];}
@@ -252,7 +252,7 @@ function renderVenueChart(){
     series.forEach((s,idx)=>{const v=s.vals[curLocal];const x=sx(curLocal);const y=sy(v);const offset=(idx-(series.length-1)/2)*14;labels+=`<text x="${Math.min(Math.max(x,40),W-40)}" y="${Math.max(y+offset-12,14)}" text-anchor="middle" font-size="10" font-weight="700" fill="${s.color}">${fmt(v,type)}</text>`;});
   }
   const labs=view.map((d,i)=>{const show=(i%stp===0)||i===curLocal||i===N-1;if(!show)return'';return `<text x="${sx(i)}" y="${H-8}" text-anchor="middle" font-size="10" fill="${i===curLocal?'#1f3864':'#8a94a6'}" font-weight="${i===curLocal?'700':'400'}">${md(d)}</text>`;}).join('');
-  const zline=(venueMetric==='平台输赢'&&mn<0&&mx>0)?`<line x1="${pl}" y1="${zeroY}" x2="${W-pr}" y2="${zeroY}" stroke="#cfd6e4" stroke-dasharray="3 3" stroke-width="1"/>`:'';
+  const zline=(['平台输赢','杀率'].includes(venueMetric)&&mn<0&&mx>0)?`<line x1="${pl}" y1="${zeroY}" x2="${W-pr}" y2="${zeroY}" stroke="#cfd6e4" stroke-dasharray="3 3" stroke-width="1"/>`:'';
   document.getElementById('vchart').innerHTML=`<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet">${zline}${lines}${dots}${labels}${labs}</svg>`;
   document.getElementById('vchartT').innerHTML=venueMetric+' 走势 <span></span>';
 }
@@ -261,7 +261,7 @@ function renderVenueTable(){
   const cfg=VENUE_METRICS.find(m=>m[0]===venueMetric),key=cfg[1],type=cfg[2];
   const rows=sel.map(name=>{const v=trends[name]?.[key]??0;const prev=cur>0?(DATA[DAYS[cur-1]]?.venue_trends||{})[name]?.[key]:null;return{name,v,prev,color:venueColor(name)};}).sort((a,b)=>b.v-a.v);
   const html=rows.map(r=>{
-    const isPl=venueMetric==='平台输赢';let valStyle='';if(isPl&&r.v<0)valStyle='color:var(--red)';else if(isPl&&r.v>0)valStyle='color:var(--green)';
+    const isPl=['平台输赢','杀率'].includes(venueMetric);let valStyle='';if(isPl&&r.v<0)valStyle='color:var(--red)';else if(isPl&&r.v>0)valStyle='color:var(--green)';
     let dlt='';if(r.prev!==null&&r.prev!==undefined){if(r.prev===0&&r.v===0)dlt='—';else if(r.prev===0)dlt='<span class="up">▲ 新增</span>';else{const pc=(r.v-r.prev)/Math.abs(r.prev)*100;dlt=`<span class="${pc>=0?'up':'down'}">${pc>=0?'▲':'▼'}${Math.abs(pc).toFixed(0)}%</span>`;}}
     return `<tr><td class="vn"><i style="background:${r.color}"></i>${r.name}</td><td class="vv" style="${valStyle}">${fmt(r.v,type)}</td><td class="vd">${dlt}</td></tr>`;
   }).join('');

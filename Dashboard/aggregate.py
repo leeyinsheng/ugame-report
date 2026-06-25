@@ -376,6 +376,7 @@ def _venue_trends(venues):
             "注单量": int(count),
             "平台输赢": round(bet - payout, 2),     # 正=平台赢
             "会员输赢": round(payout - bet, 2),     # 正=会员赢
+            "杀率": round((bet - payout) / eff * 100, 2) if eff else 0.0,  # 平台输赢/有效打码，正=平台赢
         }
     return out
 
