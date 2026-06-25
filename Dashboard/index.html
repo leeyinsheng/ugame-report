@@ -153,7 +153,7 @@
     <div class="sec"><h2><span class="bar"></span>核心营收指标</h2><table id="t_rev"></table></div>
     <div class="sec"><h2><span class="bar"></span>会员指标</h2><table id="t_mem"></table></div>
     <div class="sec"><h2><span class="bar"></span>充提指标</h2><table id="t_cp"></table></div>
-    <div class="sec"><h2><span class="bar"></span>游戏指标 · 场馆投注 TOP 5</h2><div id="t_game" class="gamewrap"></div></div>
+    <div class="sec"><h2><span class="bar"></span>游戏指标 · 场馆投注 TOP 10</h2><div id="t_game" class="gamewrap"></div></div>
     <div class="sec"><h2><span class="bar"></span>活动彩金 · 领取情况</h2><div id="t_bonus"></div></div>
     <div class="note">数据来源：raw-data 后台导出原始数据（注单 / 充提 / 账变 / 会员汇总）<br>注单按派彩结算日、充提按完成时间统计 · GGR=投注−派彩 · NGR=GGR−彩金−实际返水（不含代理佣金）· 毛利率=GGR/有效打码 · 净利率=NGR/有效打码 · 币种 USDT<br><span style="color:#b6bdcc">预计返水来自注单明细、实际返水来自账变记录（NGR 用实际返水）；累计 / 新增注册依据最新会员汇总快照回溯计算</span></div>
   </div>
@@ -222,7 +222,7 @@ function renderGame(){
 }
 let venueMetric='打码',venueRange=0,selectedVenues=new Set(),venueDefaultsSet=false;
 const VENUE_METRICS=[['打码','有效打码','m'],['平台输赢','平台输赢','m'],['注单量','注单量','i']];
-const VENUE_COLORS=['#2f5496','#1a9e6a','#7c3aed','#f59e0b','#0891b2','#4b5563','#9ca3af','#d6455d','#06b6d4','#84cc16'];
+const VENUE_COLORS=['#2f5496','#1a9e6a','#e8650c','#d6455d','#7c3aed','#0e9bb5','#d6459b','#7d9b1e','#9c5a3c','#3aa0ff','#e0a500','#475569'];
 function allVenues(){const s=new Set();DAYS.forEach(d=>Object.keys((DATA[d]||{}).venue_trends||{}).forEach(v=>s.add(v)));return Array.from(s).sort();}
 function venueColor(name){const i=allVenues().indexOf(name);return VENUE_COLORS[Math.max(i,0)%VENUE_COLORS.length];}
 function getVenueList(){const curDay=DAYS[cur]||'';const trends=(DATA[curDay]||{}).venue_trends||{};return allVenues().sort((a,b)=>{const sa=selectedVenues.has(a),sb=selectedVenues.has(b);if(sa!==sb)return sa?-1:1;const va=(trends[a]||{})['有效打码']||0,vb=(trends[b]||{})['有效打码']||0;return vb-va||a.localeCompare(b);});}

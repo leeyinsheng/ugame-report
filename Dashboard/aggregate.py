@@ -380,7 +380,7 @@ def _venue_trends(venues):
     return out
 
 
-def _top_games(venues, total_bet, n=5):
+def _top_games(venues, total_bet, n=10):
     """按投注总额取 TOP n 个游戏场馆，附派彩、平台输赢(GGR)、投注占比。"""
     top = sorted(venues.items(), key=lambda kv: kv[1][0], reverse=True)[:n]
     out = []
