@@ -287,7 +287,8 @@ def aggregate(source):
                 "彩金": round(hd_t, 2),
                 "预计返水": round(est_t, 2), "实际返水": round(fs_t, 2),
                 "NGR": round(ngr, 2),
-                "毛利率": safe(ggr * 100, eff_t), "净利率": safe(ngr * 100, eff_t),
+                "平台整体杀率": safe(ggr * 100, eff_t),  # = GGR/有效打码 = 平台输赢/有效打码
+                "净利率": safe(ngr * 100, eff_t),
             },
             "mem": {
                 "累计注册": cum, "新增注册": new_reg, "活跃会员": active,
