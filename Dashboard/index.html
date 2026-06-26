@@ -86,13 +86,13 @@
   .bpct{font-size:11px;font-weight:700;}
   .bnew{font-size:11px;color:var(--muted);margin-top:8px;padding-top:8px;border-top:1px dashed #eef1f7;font-variant-numeric:tabular-nums;}
   .bnone{padding:20px 16px;color:var(--muted);font-size:13px;text-align:center;}
-  .rbars{display:flex;align-items:flex-end;justify-content:space-between;gap:5px;height:148px;padding:18px 14px 4px;}
-  .rcol{flex:1;display:flex;flex-direction:column;align-items:center;height:100%;justify-content:flex-end;}
-  .rval{font-size:11px;font-weight:700;color:var(--blue);margin-bottom:4px;font-variant-numeric:tabular-nums;}
-  .rfill{width:72%;border-radius:5px 5px 0 0;background:linear-gradient(180deg,#2f5496,#6c8cc4);min-height:2px;}
-  .rx{display:flex;justify-content:space-between;gap:5px;padding:0 14px;}
-  .rx>div{flex:1;text-align:center;}
-  .rd{font-size:11.5px;font-weight:600;color:#46506a;}
+  .rbars{display:flex;gap:4px;padding:14px 12px 8px;overflow-x:auto;scrollbar-width:none;}
+  .rbars::-webkit-scrollbar{display:none;}
+  .rcol{flex:0 0 auto;width:40px;display:flex;flex-direction:column;align-items:center;}
+  .rval{font-size:10.5px;font-weight:700;color:var(--blue);height:15px;font-variant-numeric:tabular-nums;}
+  .rbarbox{height:100px;display:flex;align-items:flex-end;}
+  .rfill{width:22px;border-radius:5px 5px 0 0;background:linear-gradient(180deg,#2f5496,#6c8cc4);min-height:2px;}
+  .rd{font-size:11px;font-weight:600;color:#46506a;margin-top:6px;}
   .rn{font-size:10px;color:#b6bdcc;font-variant-numeric:tabular-nums;}
   .rfoot{font-size:10.5px;color:#b6bdcc;text-align:center;padding:10px 16px 13px;line-height:1.6;border-top:1px solid #f0f2f6;margin-top:6px;}
   .vmetricbar{display:flex;gap:6px;padding:12px 14px 0;}
@@ -161,7 +161,7 @@
     </div>
     <div class="sec"><h2><span class="bar"></span>核心营收指标</h2><table id="t_rev"></table></div>
     <div class="sec"><h2><span class="bar"></span>会员指标</h2><table id="t_mem"></table></div>
-    <div class="sec"><h2><span class="bar"></span>会员留存 · 首充后 D1-7</h2><div id="t_ret"></div></div>
+    <div class="sec"><h2><span class="bar"></span>会员留存 · D1-14</h2><div class="seg" id="retseg"></div><div id="t_ret"></div></div>
     <div class="sec"><h2><span class="bar"></span>充提指标</h2><table id="t_cp"></table></div>
     <div class="sec"><h2><span class="bar"></span>游戏指标 · 场馆投注 TOP 10</h2><div id="t_game" class="gamewrap"></div></div>
     <div class="sec"><h2><span class="bar"></span>活动彩金 · 领取情况</h2><div id="t_bonus"></div></div>
@@ -170,7 +170,7 @@
 </div>
 
 <script>
-let DATA={}, DAYS=[], RET=[], FCN=0;
+let DATA={}, DAYS=[], META={}, retMode='首充';
 let cur=0, metricKey="投注总额", rangeN=0;
 const md = d=>d.slice(5);
 const REV=[["投注总额","rev.投注总额","m"],["有效打码","rev.有效打码","m"],["派彩总额","rev.派彩总额","m"],["平台毛利润 GGR","rev.GGR","m"],["彩金费用","rev.彩金","m"],["预计返水（注单）","rev.预计返水","m"],["实际返水（账变）","rev.实际返水","m"],["平台净利润 NGR","rev.NGR","m"],["平台整体杀率","rev.平台整体杀率","p"],["净利率","rev.净利率","p"]];
@@ -215,22 +215,28 @@ function renderBonus(){
   }).join('');
   box.innerHTML=html;
 }
+const RET_MODES=[['首充','首充后'],['注册','注册后']];
+function setRetMode(m){retMode=m;renderRetention();}
 function renderRetention(){
+  document.getElementById('retseg').innerHTML=RET_MODES.map(([k,lab])=>`<button class="${k===retMode?'on':''}" onclick="setRetMode('${k}')">${lab} D1-14</button>`).join('');
   const box=document.getElementById('t_ret');
-  if(!RET.length){box.innerHTML='<div class="bnone">暂无首充会员数据</div>';return;}
-  const mx=Math.max(...RET.map(r=>r.rate).filter(v=>v!=null),1);
-  const d1=RET[0], d7=RET[RET.length-1];
+  const ser=((META.retention||{})[retMode])||[];
+  if(!ser.length){box.innerHTML='<div class="bnone">暂无数据</div>';return;}
+  const cnt=retMode==='首充'?(META.首充会员数||0):(META.注册会员数||0);
+  const name=retMode==='首充'?'首充':'注册';
+  const mx=Math.max(...ser.map(r=>r.rate).filter(v=>v!=null),1);
+  const d1=ser[0], dl=ser[ser.length-1];
   const kpi=(r,lab)=>r&&r.rate!=null
     ?`<div class="bkpi"><div class="lab">${lab}</div><div class="val">${r.rate.toFixed(1)}%</div><div class="dlt" style="color:var(--muted)">${r.num} / ${r.den} 人</div></div>`
     :`<div class="bkpi"><div class="lab">${lab}</div><div class="val">—</div><div class="dlt" style="color:var(--muted)">未观察</div></div>`;
-  let html=`<div class="bkpis">${kpi(d1,'次日留存 D+1')}${kpi(d7,'留存 D+'+(d7?d7.D:7))}</div>`;
-  html+=`<div class="rbars">`+RET.map(r=>{
-    const h=r.rate!=null?Math.max(r.rate/mx*96,2):0;
-    return `<div class="rcol"><div class="rval">${r.rate!=null?r.rate.toFixed(1)+'%':'—'}</div><div class="rfill" style="height:${h}px"></div></div>`;
+  let html=`<div class="bkpis">${kpi(d1,'次日留存 D+1')}${kpi(dl,'留存 D+'+(dl?dl.D:14))}</div>`;
+  html+=`<div class="rbars">`+ser.map(r=>{
+    const h=r.rate!=null?Math.max(r.rate/mx*100,2):0;
+    return `<div class="rcol"><div class="rval">${r.rate!=null?r.rate.toFixed(1)+'%':'—'}</div>`+
+      `<div class="rbarbox"><div class="rfill" style="height:${h}px"></div></div>`+
+      `<div class="rd">D+${r.D}</div><div class="rn">${r.den||'—'}</div></div>`;
   }).join('')+`</div>`;
-  html+=`<div class="rx">`+RET.map(r=>`<div class="rd">D+${r.D}</div>`).join('')+`</div>`;
-  html+=`<div class="rx" style="padding-bottom:4px">`+RET.map(r=>`<div class="rn">${r.den||'—'}</div>`).join('')+`</div>`;
-  html+=`<div class="rfoot">首充会员 ${FCN} 人 · 首充后第 N 日有投注计为留存 · 全期合并、不随所选日期变化<br>柱下数字＝该日可观察样本量（近几日因数据未满而减少）</div>`;
+  html+=`<div class="rfoot">${name}会员 ${cnt} 人 · ${name}后第 N 日有充值/提现/下注任一活动计为留存 · 全期合并、不随所选日期变化<br>柱下数字＝该日可观察样本量（近几日因数据未满而减少）</div>`;
   box.innerHTML=html;
 }
 function renderGame(){
@@ -339,7 +345,7 @@ async function reload(){
     if(d.error)throw new Error(d.error);
     DAYS=Object.keys(d).filter(k=>/^\d{4}-\d{2}-\d{2}$/.test(k));
     if(DAYS.length===0){showState('暂无数据。<br>请将后台导出的 CSV 放入 raw-data 目录后点击刷新。<br><button onclick="reload()">重新加载</button>');document.getElementById('sub').textContent='暂无数据';return;}
-    DATA=d;RET=(d._meta||{}).retention||[];FCN=(d._meta||{}).首充会员数||0;cur=DAYS.length-1;rangeN=0;
+    DATA=d;META=d._meta||{};cur=DAYS.length-1;rangeN=0;
     render();
   }catch(e){
     showState('加载失败：'+e.message+'<br>请确认已通过 server.py 启动服务。<br><button onclick="reload()">重试</button>');

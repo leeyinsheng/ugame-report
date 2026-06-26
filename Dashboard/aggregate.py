@@ -247,16 +247,19 @@ def aggregate(source):
     # ---- 会员快照：每日新增注册 / 首充 / 累计注册 ----
     reg_by_day = {}     # 日 -> 当日注册数
     fc_by_day = {}      # 日 -> 当日首充会员数
-    firstcharge = {}    # 会员ID -> 首充日（留存同期群划分用）
+    firstcharge = {}    # 会员ID -> 首充日（首充留存同期群）
+    regdate = {}        # 会员ID -> 注册日（注册留存同期群）
     if member_rows:
         for row in member_rows:
+            mid = (pick(row, "会员ID", "会员 ID") or "").strip()
             rd = daypart(row.get("注册日期时间"))
             if rd:
                 reg_by_day[rd] = reg_by_day.get(rd, 0) + 1
+                if mid:
+                    regdate[mid] = rd
             fd = daypart(row.get("第一次充值成功的日期时间"))
             if fd:
                 fc_by_day[fd] = fc_by_day.get(fd, 0) + 1
-                mid = (pick(row, "会员ID", "会员 ID") or "").strip()
                 if mid:
                     firstcharge[mid] = fd
 
@@ -318,25 +321,31 @@ def aggregate(source):
             "bonus": _bonus_for(activity_snaps, d),
         }
 
-    # ---- 会员留存（首充后 D1-7，经典第N日 · 仅投注 · 全期合并）----
-    active_days = {}            # 会员ID -> set(有注单的派彩日)
-    covered = set()            # 全部有注单数据的派彩日
+    # ---- 会员留存（D1-14，经典第N日 · 充值/提现/下注任一 · 全期合并）----
+    # 双口径：首充同期群 + 注册同期群
+    active_days = {}            # 会员ID -> set(有活动日：投注 / 充值 / 提现)
     for d2, mid, *_ in bets.values():
-        if not d2:
-            continue
-        covered.add(d2)
-        active_days.setdefault(mid, set()).add(d2)
+        if d2:
+            active_days.setdefault(mid, set()).add(d2)          # 下注
+    for d2, dep, wd, mid in cash.values():
+        if d2 and (dep > 0 or wd > 0):
+            active_days.setdefault(mid, set()).add(d2)          # 充值 / 提现
+    covered = set(days)         # 覆盖天数 = 运营日（含注单+充提）
     out["_meta"] = {
-        "retention": _retention(firstcharge, active_days, covered),
+        "retention": {
+            "首充": _retention(firstcharge, active_days, covered, max_n=14),
+            "注册": _retention(regdate, active_days, covered, max_n=14),
+        },
         "首充会员数": len(firstcharge),
+        "注册会员数": len(regdate),
     }
     return out
 
 
-def _retention(firstcharge, active_days, covered, max_n=7):
-    """经典第N日留存（仅投注，合并全部首充同期群）。
-    分母=首充+N 当天在数据覆盖范围内的会员；分子=该日有注单的会员。"""
-    if not firstcharge or not covered:
+def _retention(cohort, active_days, covered, max_n=7):
+    """经典第N日留存（充值/提现/下注任一，合并全部同期群）。
+    分母=同期群日+N 当天在数据覆盖范围内的会员；分子=该日有活动的会员。"""
+    if not cohort or not covered:
         return []
     maxday = max(covered)
 
@@ -347,15 +356,15 @@ def _retention(firstcharge, active_days, covered, max_n=7):
     out = []
     for n in range(1, max_n + 1):
         num = den = 0
-        for mid, fc in firstcharge.items():
-            target = parse(fc) + timedelta(days=n)
+        for mid, base in cohort.items():
+            target = parse(base) + timedelta(days=n)
             if target > maxd:
                 continue                          # 未观察（截尾）
             ts = target.isoformat()
             if ts not in covered:
-                continue                          # 该日无注单数据，不计入分母
+                continue                          # 该日无运营数据，不计入分母
             den += 1
-            if ts in active_days.get(mid, ()):    # 当天有投注
+            if ts in active_days.get(mid, ()):    # 当天有充值/提现/下注任一
                 num += 1
         out.append({
             "D": n,
