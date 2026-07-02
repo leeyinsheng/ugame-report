@@ -18,6 +18,7 @@ import json
 import os
 import sys
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from urllib.parse import urlparse, parse_qs
 
 import aggregate
 import sources
@@ -52,6 +53,23 @@ class Handler(BaseHTTPRequestHandler):
         if path in ("/api/summary", "/api/summary/"):
             try:
                 payload = json.dumps(get_summary(), ensure_ascii=False).encode("utf-8")
+                self._send(200, payload, "application/json; charset=utf-8")
+            except Exception as e:  # noqa: BLE001
+                self._send(500, json.dumps({"error": str(e)}).encode("utf-8"),
+                           "application/json; charset=utf-8")
+            return
+        if path.startswith("/api/reconcile"):
+            try:
+                params = parse_qs(urlparse(self.path).query)
+                member_id = (params.get("member_id") or [""])[0]
+                if not member_id:
+                    self._send(400, json.dumps({"error": "missing member_id"}).encode("utf-8"),
+                               "application/json; charset=utf-8")
+                    return
+                import reconcile as rec_mod
+                r = rec_mod.Reconciliator(SOURCE, member_id)
+                result = r.run()
+                payload = json.dumps(result, ensure_ascii=False).encode("utf-8")
                 self._send(200, payload, "application/json; charset=utf-8")
             except Exception as e:  # noqa: BLE001
                 self._send(500, json.dumps({"error": str(e)}).encode("utf-8"),

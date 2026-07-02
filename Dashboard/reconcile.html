@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>U.Game 数据核对</title>
+<style>
+  :root{--blue:#1f3864;--blue2:#2f5496;--accent:#2f5496;--bg:#f4f6fa;--card:#fff;--line:#e6eaf0;--muted:#8a94a6;--green:#1a9e6a;--red:#d6455d;--txt:#1d2433;}
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;background:var(--bg);color:var(--txt);font-size:15px;line-height:1.4;}
+  .wrap{max-width:520px;margin:0 auto;padding:0 14px 40px;}
+  header{position:sticky;top:0;z-index:10;background:linear-gradient(135deg,var(--blue),var(--blue2));color:#fff;margin:0 -14px 14px;padding:16px 18px 10px;border-radius:0 0 18px 18px;box-shadow:0 4px 16px rgba(31,56,100,.18);}
+  header h1{margin:0;font-size:18px;font-weight:700;letter-spacing:.5px;}
+  header .sub{font-size:12px;opacity:.85;margin-top:3px;}
+  .nav{display:flex;gap:4px;margin-top:10px;}
+  .nav a{flex:1;text-align:center;padding:7px 0;border-radius:10px;font-size:13px;font-weight:600;text-decoration:none;color:rgba(255,255,255,.7);background:rgba(255,255,255,.1);transition:.2s;}
+  .nav a.on{color:#fff;background:rgba(255,255,255,.25);}
+  .search{display:flex;gap:8px;margin-bottom:16px;}
+  .search input{flex:1;height:42px;border-radius:12px;border:1.5px solid var(--line);padding:0 14px;font-size:15px;font-weight:600;outline:none;background:var(--card);}
+  .search input:focus{border-color:var(--blue2);}
+  .search button{height:42px;padding:0 20px;border-radius:12px;border:none;background:var(--blue2);color:#fff;font-size:14px;font-weight:700;cursor:pointer;}
+  .search button:disabled{opacity:.5;}
+  .card{background:var(--card);border-radius:16px;margin-bottom:14px;box-shadow:0 2px 10px rgba(31,56,100,.06);overflow:hidden;}
+  .card h2{margin:0;font-size:15px;font-weight:700;color:var(--blue);padding:14px 16px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px;}
+  .card h2 .bar{width:4px;height:16px;background:var(--accent);border-radius:3px;}
+  .card h2 .cat{font-size:11px;border-radius:8px;padding:2px 8px;margin-left:auto;font-weight:600;}
+  .card h2 .cat.pass{background:#e1f5ee;color:var(--green);}
+  .card h2 .cat.fail{background:#fceaea;color:var(--red);}
+  .member-info{padding:14px 16px;display:grid;grid-template-columns:1fr 1fr;gap:6px 14px;}
+  .member-info .mi{display:flex;flex-direction:column;}
+  .member-info .mi .ml{font-size:11px;color:var(--muted);}
+  .member-info .mi .mv{font-size:14px;font-weight:600;margin-top:1px;}
+  .stats{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;padding:4px 14px 14px;}
+  .stats .st{text-align:center;padding:10px 4px;background:var(--bg);border-radius:12px;}
+  .stats .st .sn{font-size:18px;font-weight:700;color:var(--blue);font-variant-numeric:tabular-nums;}
+  .stats .st .sl{font-size:11px;color:var(--muted);margin-top:1px;}
+  .overall{text-align:center;padding:14px 16px;border-top:1px solid var(--line);}
+  .overall .obig{font-size:22px;font-weight:700;}
+  .overall .obig.pass{color:var(--green);} .overall .obig.fail{color:var(--red);}
+  .overall .osmall{font-size:13px;color:var(--muted);margin-top:2px;}
+  .clist{padding:4px 0;}
+  .citem{padding:11px 16px;border-bottom:1px solid var(--line);cursor:pointer;display:flex;align-items:center;gap:10px;}
+  .citem:last-child{border-bottom:none;}
+  .citem .ci{flex:0 0 24px;width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;}
+  .citem .ci.pass{background:#e1f5ee;color:var(--green);}
+  .citem .ci.fail{background:#fceaea;color:var(--red);}
+  .citem .cn{flex:1;min-width:0;}
+  .citem .cn .ct{font-size:14px;font-weight:600;}
+  .citem .cn .cd{font-size:12px;color:var(--muted);margin-top:1px;}
+  .citem .ca{color:var(--muted);font-size:14px;transition:.2s;}
+  .citem .ca.open{transform:rotate(180deg);}
+  .detail{display:none;background:var(--bg);padding:10px 16px 14px;border-top:1px solid var(--line);overflow-x:auto;}
+  .detail.open{display:block;}
+  .detail table{width:100%;border-collapse:collapse;font-size:13px;min-width:300px;}
+  .detail td{padding:7px 8px;border-bottom:1px solid #eef1f7;vertical-align:top;white-space:nowrap;}
+  .detail td.err{color:var(--red);font-weight:600;}
+  .detail td.num{font-variant-numeric:tabular-nums;text-align:right;}
+  .detail tr:last-child td{border-bottom:none;}
+  .detail .hdr td{color:var(--muted);font-size:11px;font-weight:600;border-bottom:1.5px solid var(--line);padding:6px 8px 5px;white-space:nowrap;}
+  .state{text-align:center;color:var(--muted);font-size:14px;padding:60px 20px;line-height:1.8;}
+  .state .spin{width:30px;height:30px;border:3px solid var(--line);border-top-color:var(--accent);border-radius:50%;margin:0 auto 14px;animation:sp 1s linear infinite;}
+  @keyframes sp{to{transform:rotate(360deg);}}
+  .state .hint{font-size:12px;color:#b6bdcc;margin-top:10px;}
+  .state button{margin-top:14px;background:var(--accent);color:#fff;border:none;border-radius:12px;padding:9px 18px;font-size:14px;font-weight:600;cursor:pointer;}
+  .note{font-size:11px;color:var(--muted);text-align:center;margin-top:8px;line-height:1.6;}
+  .nodata{text-align:center;padding:30px 20px;color:var(--muted);font-size:14px;line-height:1.8;}
+  .empty-state{font-size:40px;margin-bottom:10px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>U.Game 运营数据看板</h1>
+    <div class="sub">会员数据核对工具</div>
+    <div class="nav">
+      <a href="index.html">运营看板</a>
+      <a href="#" class="on" onclick="return false">数据核对</a>
+    </div>
+  </header>
+
+  <div class="search">
+    <input type="text" placeholder="输入会员 ID" id="memberId" onkeydown="if(event.key==='Enter')reconcile()">
+    <button id="reconcileBtn" onclick="reconcile()">核对</button>
+  </div>
+
+  <div id="initialState" class="state">
+    <div class="empty-state">🔍</div>
+    输入会员 ID 并点击「核对」<br>系统将从 OSS 扫描全部数据进行校验
+    <div class="hint">数据来源：阿里云 OSS · bucket: ug-reports</div>
+  </div>
+
+  <div id="loadingState" class="state" style="display:none">
+    <div class="spin"></div>
+    正在扫描 OSS 数据并核对…
+    <div class="hint" id="loadingHint">约需 10-30 秒</div>
+  </div>
+
+  <div id="errorState" class="state" style="display:none">
+    <div class="empty-state">⚠️</div>
+    <div id="errorMsg"></div>
+    <button onclick="reconcile()">重试</button>
+  </div>
+
+  <div id="result" style="display:none"></div>
+</div>
+
+<script>
+async function reconcile(){
+  const mid=document.getElementById('memberId').value.trim();
+  if(!mid){document.getElementById('memberId').focus();return;}
+  document.getElementById('initialState').style.display='none';
+  document.getElementById('errorState').style.display='none';
+  document.getElementById('result').style.display='none';
+  document.getElementById('loadingState').style.display='block';
+  document.getElementById('reconcileBtn').disabled=true;
+  try{
+    const r=await fetch('api/reconcile?member_id='+encodeURIComponent(mid)+'&t='+Date.now());
+    if(!r.ok){
+      const e=await r.json().catch(()=>({error:'HTTP '+r.status}));
+      throw new Error(e.error||'HTTP '+r.status);
+    }
+    const d=await r.json();
+    document.getElementById('loadingState').style.display='none';
+    document.getElementById('reconcileBtn').disabled=false;
+    if(d.error)throw new Error(d.error);
+    render(d);
+  }catch(e){
+    document.getElementById('loadingState').style.display='none';
+    document.getElementById('reconcileBtn').disabled=false;
+    document.getElementById('errorMsg').textContent=e.message;
+    document.getElementById('errorState').style.display='block';
+  }
+}
+
+function fmt(v){if(v==null||isNaN(v))return'—';return Number(v).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});}
+function fmti(v){if(v==null||isNaN(v))return'—';return Number(v).toLocaleString('en-US');}
+
+function esc(s){const d=document.createElement('div');d.textContent=s;return d.innerHTML;}
+
+function makeDetailTable(headers,rows){
+  if(!rows||!rows.length)return'';
+  let h='<tr class="hdr">'+headers.map(h=>'<td>'+esc(h)+'</td>').join('')+'</tr>';
+  let b=rows.map(r=>'<tr>'+headers.map(h=>{
+    let v=r[h];
+    if(v==null)v='—';
+    let cls='';
+    if(typeof v==='number'||(!isNaN(parseFloat(v))&&h!=='问题'&&h!=='type'&&h!=='change_type'&&h!=='serial_no'))cls=' num';
+    if(h==='问题'||h==='problem'||h.indexOf('err')>=0||h.indexOf('issue')>=0)cls=' err';
+    if(h==='diff'||h==='差异'||h==='ratio')cls=' err num';
+    if(h==='expected_diff'||h==='actual_sum')cls=' num';
+    if(h==='detail_total'||h==='summary_value')cls=' num';
+    if(h==='balance_after_cur'||h==='balance_before_nxt')cls=' num';
+    if(h==='bet_amount'||h==='payout'||h==='valid_bet'||h==='rebate'||h==='expected_winlose'||h==='actual_winlose')cls=' num';
+    return '<td class="'+cls+'">'+esc(typeof v==='number'?fmt(v):String(v))+'</td>';
+  }).join('')+'</tr>').join('');
+  return '<table>'+h+b+'</table>';
+}
+
+const CHECK_DETAILS={
+  A1:{headers:['order_no','bet_amount','payout','expected_winlose','actual_winlose'],labels:['单号','投注金额','派彩金额','应计输赢','实际输赢']},
+  A2:{headers:['order_no','bet_amount','payout'],labels:['单号','投注金额','派彩金额']},
+  A3:{headers:['order_no','bet_amount','valid_bet'],labels:['单号','投注金额','有效打码']},
+  A4:{headers:['order_no','bet_time','payout_time'],labels:['单号','投注时间','派彩时间']},
+  A5:{headers:['order_no','count','type'],labels:['单号','重复次数','类型']},
+  B1:{headers:['serial_no','change_type','ref_order'],labels:['流水号','帐变类型','关联单号']},
+  C1:{headers:['serial_no','change_type','ref_order'],labels:['流水号','帐变类型','关联单号']},
+  C2:{headers:['serial_no_cur','serial_no_nxt','balance_after_cur','balance_before_nxt'],labels:['前笔流水号','后笔流水号','前笔后余额','后笔前余额']},
+  C3:{headers:['first_balance','last_balance','expected_diff','actual_sum','diff'],labels:['期初余额','期末余额','应计差额','实际总和','差异']},
+  D1:{headers:['order_no','valid_bet','rebate','ratio'],labels:['单号','有效打码','返水','比例(%)']},
+  E1:{headers:['detail_total','summary_value','diff'],labels:['明细加总','汇总值','差异']},
+  E2:{headers:['detail_total','summary_value','diff'],labels:['明细加总','汇总值','差异']},
+  E3:{headers:['detail_total','summary_value','diff'],labels:['明细加总','汇总值','差异']},
+  E4:{headers:['detail_total','summary_value','diff'],labels:['明细加总','汇总值','差异']},
+  E5:{headers:['detail_total','summary_value','diff'],labels:['明细加总','汇总值','差异']},
+};
+
+function render(d){
+  const box=document.getElementById('result');
+
+  const mi=d.member_info;
+  let memberHTML='';
+  if(mi){
+    memberHTML='<div class="member-info">'+
+      '<div class="mi"><span class="ml">会员 ID</span><span class="mv">'+esc(mi.member_id)+'</span></div>'+
+      (mi.account?'<div class="mi"><span class="ml">账号</span><span class="mv">'+esc(mi.account)+'</span></div>':'')+
+      (mi.agent?'<div class="mi"><span class="ml">上级代理</span><span class="mv">'+esc(mi.agent)+'</span></div>':'')+
+      (mi.register_date?'<div class="mi"><span class="ml">注册日期</span><span class="mv">'+esc(mi.register_date)+'</span></div>':'')+
+    '</div>';
+  }
+
+  const st=d.stats||{};
+  const statsHTML='<div class="stats">'+
+    '<div class="st"><div class="sn">'+fmti(st.bet_count)+'</div><div class="sl">注单</div></div>'+
+    '<div class="st"><div class="sn">'+fmti(st.deposit_count)+'</div><div class="sl">充值</div></div>'+
+    '<div class="st"><div class="sn">'+fmti(st.withdraw_count)+'</div><div class="sl">提现</div></div>'+
+    '<div class="st"><div class="sn">'+fmti(st.account_change_count)+'</div><div class="sl">帐变</div></div>'+
+    '<div class="st"><div class="sn">'+fmt(st.total_bet_amount)+'</div><div class="sl">总投注</div></div>'+
+    '<div class="st"><div class="sn" style="color:'+(st.total_winlose<0?'var(--red)':'var(--blue)')+'">'+fmt(st.total_winlose)+'</div><div class="sl">总输赢</div></div>'+
+  '</div>';
+
+  const sm=d.summary||{};
+  const overallClass=sm.failed>0?'fail':'pass';
+  const overallHTML='<div class="overall">'+
+    '<div class="obig '+overallClass+'">'+(sm.failed>0?'❌ ':'✅ ')+sm.passed+' / '+sm.total+'</div>'+
+    '<div class="osmall">通过 '+sm.passed+' 项 · 失败 '+sm.failed+' 项</div>'+
+  '</div>';
+
+  const CAT_NAMES={A:'注单核对',B:'充值提现核对',C:'帐变核对',D:'返水核对',E:'会员汇总核对'};
+  let cardsHTML='';
+  for(const [cid,cat] of Object.entries(d.categories||{})){
+    const chks=cat.checks||{};
+    const catCls=cat.failed>0?'fail':'pass';
+    let itemsHTML='<div class="clist">';
+    for(const [code,chk] of Object.entries(chks)){
+      const cls=chk.pass?'pass':'fail';
+      const icon=chk.pass?'✓':'✕';
+      const dd=CHECK_DETAILS[code];
+      const errs=chk.errors||[];
+      const hasDetail=errs.length>0&&dd;
+      const detailId='d_'+cid+'_'+code;
+      let desc='已检查 '+fmti(chk.checked)+' 笔';
+      if(!chk.pass)desc+=' · '+errs.length+' 笔异常';
+      itemsHTML+='<div class="citem" onclick="toggleDetail(\''+detailId+'\')">'+
+        '<div class="ci '+cls+'">'+icon+'</div>'+
+        '<div class="cn"><div class="ct">'+code+' '+esc(chk.name)+'</div><div class="cd">'+desc+'</div></div>'+
+        (hasDetail?'<span class="ca">▾</span>':'')+
+      '</div>';
+      if(hasDetail){
+        const labels=dd.labels||dd.headers;
+        const rows=errs.map(e=>{
+          const o={};
+          dd.headers.forEach(h=>{
+            if(h==='ratio'&&e[h]!=null)o[h]=e[h];
+            else o[h]=e[h];
+          });
+          return o;
+        });
+        const headers=dd.headers.map((h,i)=>labels[i]||h);
+        itemsHTML+='<div class="detail" id="'+detailId+'">'+makeDetailTable(headers,rows)+'</div>';
+      }else if(!chk.pass&&errs.length&&errs[0].msg){
+        itemsHTML+='<div class="detail" id="'+detailId+'"><div style="color:var(--muted);font-size:13px;padding:8px 4px;">'+esc(errs[0].msg)+'</div></div>';
+      }
+    }
+    itemsHTML+='</div>';
+    cardsHTML+='<div class="card"><h2><span class="bar"></span>'+cid+'. '+CAT_NAMES[cid]+' <span class="cat '+catCls+'">'+
+      (cat.failed>0?'❌ ':'✅ ')+cat.passed+'/'+cat.total+'</span></h2>'+itemsHTML+'</div>';
+  }
+
+  box.innerHTML=
+    '<div class="card"><h2><span class="bar"></span>会员信息</h2>'+memberHTML+statsHTML+overallHTML+'</div>'+
+    cardsHTML+
+    '<div class="note">每次核对实时从 OSS 扫描全部原始 CSV 文件<br>全部 15 项检查 · 5 大类（注单 / 充值提现 / 帐变 / 返水 / 会员汇总）</div>';
+  box.style.display='block';
+}
+
+function toggleDetail(id){
+  const el=document.getElementById(id);
+  if(!el)return;
+  el.classList.toggle('open');
+  const arrow=el.previousElementSibling?.querySelector('.ca');
+  if(arrow)arrow.classList.toggle('open');
+}
+</script>
+</body>
+</html>
