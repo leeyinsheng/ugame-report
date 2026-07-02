@@ -173,12 +173,12 @@ def aggregate(source):
                     if not k:
                         continue
                     # 有效打码列名三种写法：有效投注 / 有效投注金额 / 有效打码
-                    # 预计返水：仅部分注单导出含此列（繁体写法 預計返水）
+                    # 返水列名：返水 / 预计返水 / 預計返水（新导出为"返水"）
                     bets[k] = (daypart(row.get("派彩日期时间")), row.get("会员ID") or "",
                                num(row.get("投注金额")),
                                num(pick(row, "有效投注", "有效投注金额", "有效打码")),
                                num(row.get("派彩金额")),
-                               num(pick(row, "预计返水", "預計返水")),
+                               num(pick(row, "返水", "预计返水", "預計返水")),
                                (pick(row, "游戏场馆", "遊戲場館") or "其他").strip() or "其他")
                 elif kind == "ledger":
                     k = row.get("流水号") or ""
@@ -204,12 +204,12 @@ def aggregate(source):
                     cash[k] = (daypart(row.get("完成时间")), dep, wd, row.get("会员ID") or "")
 
     # ---- 按日汇总 ----
-    # rev: [投注, 有效, 派彩, 实际返水(账变), 彩金, set(活跃会员), 预计返水(注单)]
+    # rev: [投注, 有效, 派彩, 实际返水(账变), 彩金, set(活跃会员), 预计返水(注单), 注单量]
     rev = {}
     cp = {}    # 日 -> [充值额, 充值笔, set(充值人), 提现额, 提现笔, set(提现人)]
 
     def _rev(d):
-        return rev.setdefault(d, [0.0, 0.0, 0.0, 0.0, 0.0, set(), 0.0])
+        return rev.setdefault(d, [0.0, 0.0, 0.0, 0.0, 0.0, set(), 0.0, 0])
 
     def _cp(d):
         return cp.setdefault(d, [0.0, 0, set(), 0.0, 0, set()])
@@ -223,6 +223,7 @@ def aggregate(source):
         a[0] += bet; a[1] += eff; a[2] += payout
         a[5].add(mid)
         a[6] += est                    # 预计返水（来自注单明细）
+        a[7] += 1                      # 注单量
         gv = game.setdefault(d, {}).setdefault(venue_display(venue), [0.0, 0.0, 0.0, 0])
         gv[0] += bet; gv[1] += payout; gv[2] += eff; gv[3] += 1
 
@@ -275,10 +276,12 @@ def aggregate(source):
         return sum(n for fd, n in fc_by_day.items() if fd <= day)
 
     out = {}
+    cum_dep = 0.0
+    cum_wd = 0.0
     for d in days:
-        rv = rev.get(d, [0.0, 0.0, 0.0, 0.0, 0.0, set(), 0.0])
+        rv = rev.get(d, [0.0, 0.0, 0.0, 0.0, 0.0, set(), 0.0, 0])
         cv = cp.get(d, [0.0, 0, set(), 0.0, 0, set()])
-        bet_t, eff_t, pay_t, fs_t, hd_t, act, est_t = rv
+        bet_t, eff_t, pay_t, fs_t, hd_t, act, est_t, bet_n = rv
         ggr = bet_t - pay_t
         ngr = ggr - hd_t - fs_t        # NGR 用实际返水(账变)，非预计返水
         active = len(act)
@@ -286,6 +289,8 @@ def aggregate(source):
         new_reg = reg_by_day.get(d, 0)
         first_charge = fc_by_day.get(d, 0)
         dep_t, dep_n, dep_p, wd_t, wd_n, wd_p = cv
+        cum_dep += dep_t
+        cum_wd += wd_t
         dep_people = len(dep_p); wd_people = len(wd_p)
 
         def safe(n, dlen):
@@ -293,7 +298,8 @@ def aggregate(source):
 
         out[d] = {
             "rev": {
-                "投注总额": round(bet_t, 2), "有效打码": round(eff_t, 2),
+                "投注总额": round(bet_t, 2), "注单量": bet_n,
+                "有效打码": round(eff_t, 2),
                 "派彩总额": round(pay_t, 2), "GGR": round(ggr, 2),
                 "彩金": round(hd_t, 2),
                 "预计返水": round(est_t, 2), "实际返水": round(fs_t, 2),
@@ -313,8 +319,10 @@ def aggregate(source):
                 "ARPU": safe(ngr, active),
             },
             "cp": {
-                "充值总额": round(dep_t, 2), "充值笔数": dep_n, "充值人数": dep_people,
-                "提现总额": round(wd_t, 2), "提现笔数": wd_n, "提现人数": wd_people,
+                "充值总额": round(dep_t, 2), "累计充值总额": round(cum_dep, 2),
+                "充值笔数": dep_n, "充值人数": dep_people,
+                "提现总额": round(wd_t, 2), "累计提现总额": round(cum_wd, 2),
+                "提现笔数": wd_n, "提现人数": wd_people,
                 "充提差额": round(dep_t - wd_t, 2),
                 "充提比率": round(dep_t / wd_t, 2) if wd_t else 0.0,
             },

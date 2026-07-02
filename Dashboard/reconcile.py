@@ -119,7 +119,8 @@ class Reconciliator:
         return self._build(cats)
 
     def _collect_data(self):
-        for name, _mtime, fh in self.source.iter_csv():
+        self._summary_mtime = 0
+        for name, mtime, fh in self.source.iter_csv():
             ftype = _classify(name)
             if ftype is None:
                 continue
@@ -133,7 +134,7 @@ class Reconciliator:
                 elif ftype == 'account_change':
                     self._parse_account(headers, reader)
                 elif ftype == 'member_summary':
-                    self._parse_summary(headers, reader)
+                    self._parse_summary(headers, reader, mtime)
             except Exception:
                 continue
 
@@ -205,7 +206,7 @@ class Reconciliator:
                 'change_time': _val(row, m.get('change_time')),
             })
 
-    def _parse_summary(self, headers, reader):
+    def _parse_summary(self, headers, reader, mtime=0):
         m = _map_columns(headers, SUMMARY_FIELDS)
         mid_col = m.get('member_id')
         if mid_col is None:
@@ -215,6 +216,9 @@ class Reconciliator:
                 continue
             if not self._row_matches(row, mid_col):
                 continue
+            if mtime < self._summary_mtime:
+                continue
+            self._summary_mtime = mtime
             self.member_summary = {
                 'account': _val(row, m.get('account')),
                 'agent': _val(row, m.get('agent')),
