@@ -107,6 +107,7 @@ class Reconciliator:
         self.withdrawals = []
         self.account_changes = []
         self.member_summary = None
+        self._seen_orders = set()
 
     def run(self):
         self._collect_data()
@@ -151,6 +152,11 @@ class Reconciliator:
                 continue
             if not self._row_matches(row, mid_col):
                 continue
+            order_no = _val(row, m.get('order_no'))
+            if order_no and order_no in self._seen_orders:
+                continue
+            if order_no:
+                self._seen_orders.add(order_no)
             self.bets.append({
                 'order_no': _val(row, m.get('order_no')),
                 'third_order_no': _val(row, m.get('third_order_no')),
@@ -331,23 +337,11 @@ class Reconciliator:
                 bw_orders.add(w['order_no'])
 
         b1_errors = []
-        bw_prefixes = set()
-        for o in bw_orders:
-            bw_prefixes.add(o)
-
-        def _match_bw(ref):
-            if ref in bw_orders:
-                return True
-            prefix = ref.split('-')[0] if ref and '-' in ref else None
-            if prefix and prefix in bw_prefixes:
-                return True
-            return False
-
         for ac in self.account_changes:
             ct = (ac['change_type'] or '').lower()
             if any(k in ct for k in ('充值', '提现', '存款', '取款')):
                 ref = ac['ref_order']
-                if ref and not _match_bw(ref):
+                if ref and ref not in bw_orders:
                     b1_errors.append({
                         'serial_no': ac['serial_no'],
                         'change_type': ac['change_type'],
@@ -363,29 +357,17 @@ class Reconciliator:
 
     def _check_account_change(self):
         checks = {}
-        bet_orders = set()
-        bet_prefixes = set()
+        order_nos = set()
         for b in self.bets:
             if b['order_no']:
-                bet_orders.add(b['order_no'])
-            if b['third_order_no']:
-                bet_orders.add(b['third_order_no'])
-                bet_prefixes.add(b['third_order_no'])
-
-        def _match_ref(ref):
-            if ref in bet_orders:
-                return True
-            prefix = ref.split('-')[0] if ref and '-' in ref else None
-            if prefix and prefix in bet_prefixes:
-                return True
-            return False
+                order_nos.add(b['order_no'])
 
         c1_errors = []
         for ac in self.account_changes:
             ct = (ac['change_type'] or '').lower()
             if any(k in ct for k in ('游戏', '注单', '派彩', '投注')):
                 ref = ac['ref_order']
-                if ref and not _match_ref(ref):
+                if ref and ref not in order_nos:
                     c1_errors.append({
                         'serial_no': ac['serial_no'],
                         'change_type': ac['change_type'],
