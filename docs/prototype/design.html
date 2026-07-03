@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>U.Game 数据核对 - 原型</title>
+<title>U.Game 数据核对 - 原型 v1.1</title>
 <style>
   :root{--blue:#1f3864;--blue2:#2f5496;--accent:#2f5496;--bg:#f4f6fa;--card:#fff;--line:#e6eaf0;--muted:#8a94a6;--green:#1a9e6a;--red:#d6455d;--txt:#1d2433;}
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
@@ -19,18 +19,21 @@
   .search input{flex:1;height:42px;border-radius:12px;border:1.5px solid var(--line);padding:0 14px;font-size:15px;font-weight:600;outline:none;background:var(--card);}
   .search input:focus{border-color:var(--blue2);}
   .search button{height:42px;padding:0 20px;border-radius:12px;border:none;background:var(--blue2);color:#fff;font-size:14px;font-weight:700;cursor:pointer;}
-  .search button:disabled{opacity:.5;}
   .card{background:var(--card);border-radius:16px;margin-bottom:14px;box-shadow:0 2px 10px rgba(31,56,100,.06);overflow:hidden;}
   .card h2{margin:0;font-size:15px;font-weight:700;color:var(--blue);padding:14px 16px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px;}
   .card h2 .bar{width:4px;height:16px;background:var(--accent);border-radius:3px;}
-  .card h2 .cat{font-size:11px;background:#eef1f7;color:#46506a;border-radius:8px;padding:2px 8px;margin-left:auto;font-weight:600;}
-  .summary{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;padding:14px 14px 4px;}
-  .summary div{text-align:center;padding:10px 6px;background:var(--bg);border-radius:12px;}
-  .summary .num{font-size:20px;font-weight:700;color:var(--blue);}
-  .summary .lab{font-size:11px;color:var(--muted);margin-top:2px;}
-  .member-card{padding:14px 16px;}
-  .member-row{display:flex;justify-content:space-between;padding:4px 0;font-size:13.5px;}
-  .member-row .l{color:#46506a;} .member-row .r{font-weight:600;}
+  .card h2 .cat{font-size:11px;border-radius:8px;padding:2px 8px;margin-left:auto;font-weight:600;}
+  .card h2 .cat.pass{background:#e1f5ee;color:var(--green);}
+  .card h2 .cat.fail{background:#fceaea;color:var(--red);}
+  .member-info{padding:14px 16px;display:grid;grid-template-columns:1fr 1fr;gap:6px 14px;}
+  .member-info .mi{display:flex;flex-direction:column;}
+  .member-info .mi .ml{font-size:11px;color:var(--muted);}
+  .member-info .mi .mv{font-size:14px;font-weight:600;margin-top:1px;}
+  .member-info .mi.wide{grid-column:1/-1;}
+  .stats{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;padding:4px 14px 14px;}
+  .stats .st{text-align:center;padding:10px 4px;background:var(--bg);border-radius:12px;}
+  .stats .st .sn{font-size:18px;font-weight:700;color:var(--blue);}
+  .stats .st .sl{font-size:11px;color:var(--muted);margin-top:1px;}
   .overall{text-align:center;padding:14px 16px;border-top:1px solid var(--line);}
   .overall .big{font-size:24px;font-weight:700;}
   .overall .big.pass{color:var(--green);} .overall .big.fail{color:var(--red);}
@@ -57,91 +60,77 @@
   .state .spin{width:30px;height:30px;border:3px solid var(--line);border-top-color:var(--accent);border-radius:50%;margin:0 auto 14px;animation:sp 1s linear infinite;}
   @keyframes sp{to{transform:rotate(360deg);}}
   .state .hint{font-size:12px;color:#b6bdcc;margin-top:10px;}
-  .reconcile-btn{background:var(--blue2);color:#fff;border:none;cursor:pointer;font-size:14px;font-weight:700;padding:0 20px;height:42px;border-radius:12px;}
   .note{font-size:11px;color:var(--muted);text-align:center;margin-top:8px;line-height:1.6;}
-  .match{color:var(--green);font-weight:600;}
-  .mismatch{color:var(--red);font-weight:600;}
-  .eyebrow{padding:6px 16px 2px;display:flex;justify-content:space-between;font-size:12px;color:var(--muted);}
 </style>
 </head>
 <body>
 <div class="wrap">
   <header>
     <h1>U.Game 运营数据看板</h1>
-    <div class="sub">数据核对工具</div>
+    <div class="sub">会员数据核对工具</div>
     <div class="nav">
       <a href="#" onclick="return false">运营看板</a>
       <a href="#" class="on" onclick="return false">数据核对</a>
     </div>
   </header>
 
-  <!-- 搜索区域 -->
   <div class="search">
-    <input type="text" placeholder="输入会员 ID" value="10086" id="memberId">
+    <input type="text" placeholder="输入会员 ID" value="2072115169449218048" id="memberId">
     <button onclick="doReconcile()">核对</button>
   </div>
 
-  <!-- 默认提示 -->
   <div id="initialState" class="state">
     <div style="font-size:40px;margin-bottom:10px;">🔍</div>
     输入会员 ID 并点击「核对」<br>系统将从 OSS 扫描全部数据进行校验
     <div class="hint">数据来源：阿里云 OSS · bucket: ug-reports</div>
   </div>
 
-  <!-- 加载中 -->
   <div id="loadingState" class="state" style="display:none">
     <div class="spin"></div>
     正在扫描 OSS 数据并核对…
-    <div class="hint">约需 10-30 秒（扫描 196 个 CSV 文件）</div>
+    <div class="hint">约需 5-15 秒</div>
   </div>
 
-  <!-- 结果区 -->
   <div id="result" style="display:none">
 
-    <!-- 会员信息 -->
+    <!-- 会员信息 + 统计 + 总结 -->
     <div class="card">
       <h2><span class="bar"></span>会员信息</h2>
-      <div class="member-card" id="memberInfo">
-        <div class="member-row">
-          <span class="l">会员 ID</span>
-          <span class="r" id="mid">10086</span>
-        </div>
-        <div class="member-row">
-          <span class="l">上级代理</span>
-          <span class="r" id="agent">agent_king</span>
-        </div>
-        <div class="member-row">
-          <span class="l">注册日期</span>
-          <span class="r" id="regDate">2026-01-15</span>
-        </div>
-        <div class="member-row">
-          <span class="l">最后活跃</span>
-          <span class="r" id="lastActive">2026-06-30</span>
-        </div>
+      <div class="member-info">
+        <div class="mi"><span class="ml">会员 ID</span><span class="mv">2072115169449218048</span></div>
+        <div class="mi"><span class="ml">上級代理</span><span class="mv">a1760356615</span></div>
+        <div class="mi"><span class="ml">註冊日期時間</span><span class="mv">2026-06-30 20:28:49</span></div>
+        <div class="mi"><span class="ml">首次充值日期時間</span><span class="mv">2026-06-30 20:30:15</span></div>
+        <div class="mi"><span class="ml">總注單量</span><span class="mv">74,257</span></div>
+        <div class="mi"><span class="ml">充值總金額</span><span class="mv">350.00</span></div>
+        <div class="mi"><span class="ml">提現總金額</span><span class="mv">22.00</span></div>
+        <div class="mi"><span class="ml">總有效打碼</span><span class="mv">83,807.60</span></div>
+        <div class="mi"><span class="ml">返水總金額</span><span class="mv">15.50</span></div>
+        <div class="mi"><span class="ml">已領取彩金總金額</span><span class="mv">4.57</span></div>
+        <div class="mi wide"><span class="ml">會員總輸贏</span><span class="mv" style="font-size:16px;color:var(--green)">-336.50</span></div>
       </div>
-      <div class="summary" id="statsSummary">
-        <div><div class="num" id="s_bets">245</div><div class="lab">注单笔数</div></div>
-        <div><div class="num" id="s_deposits">8</div><div class="lab">充值笔数</div></div>
-        <div><div class="num" id="s_withdraws">4</div><div class="lab">提现笔数</div></div>
-        <div><div class="num" id="s_accounts">156</div><div class="lab">帐变笔数</div></div>
-        <div><div class="num" id="s_totalBet">150,000</div><div class="lab">总投注</div></div>
-        <div><div class="num" id="s_totalWin">-5,000</div><div class="lab">总输赢</div></div>
+      <div class="stats">
+        <div class="st"><div class="sn">74,257</div><div class="sl">注单</div></div>
+        <div class="st"><div class="sn">4</div><div class="sl">充值</div></div>
+        <div class="st"><div class="sn">0</div><div class="sl">提现</div></div>
+        <div class="st"><div class="sn">83,807.60</div><div class="sl">总投注</div></div>
+        <div class="st"><div class="sn" style="color:var(--green)">-336.50</div><div class="sl">总输赢</div></div>
       </div>
-      <div class="overall" id="overallResult">
-        <div class="big pass">✅ 13 / 15</div>
-        <div class="small">通过 13 项 · 失败 2 项</div>
+      <div class="overall">
+        <div class="big pass">✅ 6 / 6</div>
+        <div class="small">通过 6 项 · 失败 0 项</div>
       </div>
     </div>
 
     <!-- A. 注单核对 -->
     <div class="card">
-      <h2><span class="bar"></span>A. 注单核对 <span class="cat">PASS 4/5</span></h2>
+      <h2><span class="bar"></span>A. 注单核对 <span class="cat pass">PASS 5/5</span></h2>
       <div class="check-list">
         <div class="check-item" onclick="toggleDetail(this)">
           <div class="icon pass">✓</div>
           <div class="info">
             <div class="name">A1 会员输赢公式</div>
-            <div class="desc">会员输赢 = 派彩 − 投注 · 已检查 245 笔</div>
+            <div class="desc">会员输赢 = 派彩 − 投注 · 已检查 74,257 笔</div>
           </div>
           <span class="arrow">▾</span>
         </div>
@@ -165,7 +154,7 @@
           <div class="icon pass">✓</div>
           <div class="info">
             <div class="name">A3 有效打码</div>
-            <div class="desc">有效打码 ≤ 投注金额 · 已检查 245 笔</div>
+            <div class="desc">有效打码 ≤ 投注金额 · 已检查 74,257 笔</div>
           </div>
           <span class="arrow">▾</span>
         </div>
@@ -173,7 +162,7 @@
           <div class="icon pass">✓</div>
           <div class="info">
             <div class="name">A4 时间顺序</div>
-            <div class="desc">派彩时间 > 投注时间 · 已检查 245 笔</div>
+            <div class="desc">派彩时间 > 投注时间 · 已检查 74,257 笔</div>
           </div>
           <span class="arrow">▾</span>
         </div>
@@ -190,125 +179,26 @@
 
     <!-- B. 充值提现核对 -->
     <div class="card">
-      <h2><span class="bar"></span>B. 充值提现核对 <span class="cat">PASS 1/1</span></h2>
+      <h2><span class="bar"></span>B. 充值提现核对 <span class="cat pass">PASS 1/1</span></h2>
       <div class="check-list">
         <div class="check-item" onclick="toggleDetail(this)">
           <div class="icon pass">✓</div>
           <div class="info">
             <div class="name">B1 关联单号</div>
-            <div class="desc">帐变中充值/提现的关联单号对应到充值提现明细 · 已检查 12 笔</div>
+            <div class="desc">帐变中充值/提现的关联单号对应到充值提现明细 · 已检查 4 笔</div>
           </div>
           <span class="arrow">▾</span>
         </div>
       </div>
     </div>
 
-    <!-- C. 帐变核对 -->
-    <div class="card">
-      <h2><span class="bar"></span>C. 帐变核对 <span class="cat">PASS 3/3</span></h2>
-      <div class="check-list">
-        <div class="check-item" onclick="toggleDetail(this)">
-          <div class="icon pass">✓</div>
-          <div class="info">
-            <div class="name">C1 游戏关联</div>
-            <div class="desc">帐变中游戏类型的关联单号对应到注单明细 · 已检查 89 笔</div>
-          </div>
-          <span class="arrow">▾</span>
-        </div>
-        <div class="check-item" onclick="toggleDetail(this)">
-          <div class="icon pass">✓</div>
-          <div class="info">
-            <div class="name">C2 余额连续性</div>
-            <div class="desc">前笔帐变后余额 = 后笔帐变前余额 · 已检查 155 笔</div>
-          </div>
-          <span class="arrow">▾</span>
-        </div>
-        <div class="check-item" onclick="toggleDetail(this)">
-          <div class="icon pass">✓</div>
-          <div class="info">
-            <div class="name">C3 帐变总和</div>
-            <div class="desc">期末−期初 = Σ帐变金额</div>
-          </div>
-          <span class="arrow">▾</span>
-        </div>
-      </div>
-    </div>
-
-    <!-- D. 返水核对 -->
-    <div class="card">
-      <h2><span class="bar"></span>D. 返水核对 <span class="cat">PASS 1/1</span></h2>
-      <div class="check-list">
-        <div class="check-item" onclick="toggleDetail(this)">
-          <div class="icon pass">✓</div>
-          <div class="info">
-            <div class="name">D1 返水比例</div>
-            <div class="desc">返水 / 有效打码 在 0%~2% · 已检查 245 笔</div>
-          </div>
-          <span class="arrow">▾</span>
-        </div>
-      </div>
-    </div>
-
-    <!-- E. 会员汇总核对 -->
-    <div class="card">
-      <h2><span class="bar"></span>E. 会员汇总核对 <span class="cat">PASS 4/5</span></h2>
-      <div class="check-list">
-        <div class="check-item" onclick="toggleDetail(this)">
-          <div class="icon pass">✓</div>
-          <div class="info">
-            <div class="name">E1 充值总额</div>
-            <div class="desc">明细 12,345.00 vs 汇总 12,345.00 <span class="match">✓ 吻合</span></div>
-          </div>
-          <span class="arrow">▾</span>
-        </div>
-        <div class="check-item" onclick="toggleDetail(this)">
-          <div class="icon pass">✓</div>
-          <div class="info">
-            <div class="name">E2 提现总额</div>
-            <div class="desc">明细 5,678.00 vs 汇总 5,678.00 <span class="match">✓ 吻合</span></div>
-          </div>
-          <span class="arrow">▾</span>
-        </div>
-        <div class="check-item" onclick="toggleDetail(this)">
-          <div class="icon fail">✕</div>
-          <div class="info">
-            <div class="name">E3 输赢总额</div>
-            <div class="desc">明细 -5,000.00 vs 汇总 -4,987.65 <span class="mismatch">✗ 差 12.35</span></div>
-          </div>
-          <span class="arrow">▾</span>
-        </div>
-        <div class="detail-table" id="dt_E3">
-          <table>
-            <tr class="hdr"><td>项目</td><td>明细加总</td><td>汇总值</td><td>差异</td></tr>
-            <tr><td>会员输赢</td><td>-5,000.00</td><td>-4,987.65</td><td>+12.35</td></tr>
-          </table>
-        </div>
-        <div class="check-item" onclick="toggleDetail(this)">
-          <div class="icon pass">✓</div>
-          <div class="info">
-            <div class="name">E4 注单总数</div>
-            <div class="desc">明细 245 vs 汇总 245 <span class="match">✓ 吻合</span></div>
-          </div>
-          <span class="arrow">▾</span>
-        </div>
-        <div class="check-item" onclick="toggleDetail(this)">
-          <div class="icon pass">✓</div>
-          <div class="info">
-            <div class="name">E5 有效打码</div>
-            <div class="desc">明细 135,000.00 vs 汇总 135,000.00 <span class="match">✓ 吻合</span></div>
-          </div>
-          <span class="arrow">▾</span>
-        </div>
-      </div>
-    </div>
-
-    <div class="note">数据来源：raw-data 原始 CSV · 每次核对实时从 OSS 扫描全部文件<br>全部 15 项检查 · 5 大类（注单 / 充值提现 / 帐变 / 返水 / 会员汇总）</div>
+    <div class="note">数据来源：阿里云 OSS · bucket: ug-reports<br>全部 6 项检查 · 2 大类（注单 / 充值提现）</div>
   </div>
 </div>
 
 <script>
 function toggleDetail(el) {
-  const dt = el.nextElementSibling;
+  var dt = el.nextElementSibling;
   if (dt && dt.classList.contains('detail-table')) {
     dt.classList.toggle('open');
     el.querySelector('.arrow').classList.toggle('open');
@@ -318,7 +208,7 @@ function doReconcile() {
   document.getElementById('initialState').style.display = 'none';
   document.getElementById('loadingState').style.display = 'block';
   document.getElementById('result').style.display = 'none';
-  setTimeout(() => {
+  setTimeout(function() {
     document.getElementById('loadingState').style.display = 'none';
     document.getElementById('result').style.display = 'block';
   }, 1500);
