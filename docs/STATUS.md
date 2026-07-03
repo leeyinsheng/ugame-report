@@ -8,4 +8,4 @@
 | 4 | Code Review | ✅ |
 | 5 | Regression Testing | ✅ |
 | 6 | Feature Verification | ✅ |
-| 7 | User Acceptance | ⏳ (等待部署) |
+| 7 | User Acceptance | ✅ |
