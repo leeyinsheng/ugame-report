@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>U.Game 数据核对 - 原型 v1.1</title>
+  <title>U.Game 数据核对 - 原型 v1.2</title>
 <style>
   :root{--blue:#1f3864;--blue2:#2f5496;--accent:#2f5496;--bg:#f4f6fa;--card:#fff;--line:#e6eaf0;--muted:#8a94a6;--green:#1a9e6a;--red:#d6455d;--txt:#1d2433;}
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
@@ -124,53 +124,67 @@
 
     <!-- A. 注单核对 -->
     <div class="card">
-      <h2><span class="bar"></span>A. 注单核对 <span class="cat pass">PASS 5/5</span></h2>
+      <h2><span class="bar"></span>A. 注单核对 <span class="cat pass">PASS 6/6</span></h2>
       <div class="check-list">
         <div class="check-item" onclick="toggleDetail(this)">
           <div class="icon pass">✓</div>
           <div class="info">
-            <div class="name">A1 会员输赢公式</div>
-            <div class="desc">会员输赢 = 派彩 − 投注 · 已检查 74,257 笔</div>
+            <div class="name">A1 本平台单号唯一性</div>
+            <div class="desc">所有注单的本平台单号无重复 · 已检查 74,257 笔</div>
           </div>
           <span class="arrow">▾</span>
         </div>
         <div class="check-item" onclick="toggleDetail(this)">
           <div class="icon fail">✕</div>
           <div class="info">
-            <div class="name">A2 派彩合理性</div>
-            <div class="desc">派彩金额 ≥ 0 · 3 笔异常</div>
+            <div class="name">A2 三方单号唯一性（按供应商）</div>
+            <div class="desc">同一供应商下三方单号无重复 · 2 笔异常</div>
           </div>
           <span class="arrow">▾</span>
         </div>
-        <div class="detail-table" id="dt_A2">
+        <div class="detail-table" id="dt_A1">
           <table>
-            <tr class="hdr"><td>本平台单号</td><td>投注金额</td><td>派彩金额</td><td>问题</td></tr>
-            <tr><td>U12345</td><td>100.00</td><td>-50.00</td><td>负派彩</td></tr>
-            <tr><td>U12346</td><td>200.00</td><td>-10.00</td><td>负派彩</td></tr>
-            <tr><td>U12389</td><td>50.00</td><td>-5.50</td><td>负派彩</td></tr>
+            <tr class="hdr"><td>供应商</td><td>三方单号</td><td>重复次数</td></tr>
+            <tr><td>PP 电子</td><td>PP230601_001</td><td>2</td></tr>
+            <tr><td>七星视讯</td><td>QX_777</td><td>3</td></tr>
           </table>
         </div>
         <div class="check-item" onclick="toggleDetail(this)">
           <div class="icon pass">✓</div>
           <div class="info">
-            <div class="name">A3 有效打码</div>
-            <div class="desc">有效打码 ≤ 投注金额 · 已检查 74,257 笔</div>
+            <div class="name">A3 特定游戏投注金额非零</div>
+            <div class="desc">真人/彩票/体育投注金额不可为 0 · 已检查 120 笔</div>
           </div>
           <span class="arrow">▾</span>
         </div>
         <div class="check-item" onclick="toggleDetail(this)">
           <div class="icon pass">✓</div>
           <div class="info">
-            <div class="name">A4 时间顺序</div>
-            <div class="desc">派彩时间 > 投注时间 · 已检查 74,257 笔</div>
+            <div class="name">A4 派彩合理性</div>
+            <div class="desc">派彩金额 ≥ 0 · 已检查 74,257 笔</div>
           </div>
           <span class="arrow">▾</span>
         </div>
         <div class="check-item" onclick="toggleDetail(this)">
+          <div class="icon fail">✕</div>
+          <div class="info">
+            <div class="name">A5 游戏帐变关联</div>
+            <div class="desc">帐变游戏类型关联单号 → 注单 · 5 笔异常</div>
+          </div>
+          <span class="arrow">▾</span>
+        </div>
+        <div class="detail-table" id="dt_A5">
+          <table>
+            <tr class="hdr"><td>帐变流水号</td><td>帐变类型</td><td>关联单号</td></tr>
+            <tr><td>SN001</td><td>投注-扣款</td><td>4393200_648</td></tr>
+            <tr><td>SN002</td><td>投注-扣款</td><td>614661870</td></tr>
+          </table>
+        </div>
+        <div class="check-item" onclick="toggleDetail(this)">
           <div class="icon pass">✓</div>
           <div class="info">
-            <div class="name">A5 单号唯一性</div>
-            <div class="desc">本平台单号 / 三方单号无重复</div>
+            <div class="name">A6 时间顺序</div>
+            <div class="desc">派彩时间 ≥ 投注时间 · 已检查 74,257 笔</div>
           </div>
           <span class="arrow">▾</span>
         </div>
