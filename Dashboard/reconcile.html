@@ -137,20 +137,20 @@ function fmti(v){if(v==null||isNaN(v))return'—';return Number(v).toLocaleStrin
 
 function esc(s){const d=document.createElement('div');d.textContent=s;return d.innerHTML;}
 
-function makeDetailTable(headers,rows){
+function makeDetailTable(keys,labels,rows){
   if(!rows||!rows.length)return'';
-  let h='<tr class="hdr">'+headers.map(h=>'<td>'+esc(h)+'</td>').join('')+'</tr>';
-  let b=rows.map(r=>'<tr>'+headers.map(h=>{
-    let v=r[h];
+  let h='<tr class="hdr">'+labels.map(l=>'<td>'+esc(l)+'</td>').join('')+'</tr>';
+  let b=rows.map(r=>'<tr>'+keys.map(k=>{
+    let v=r[k];
     if(v==null)v='—';
     let cls='';
-    if(typeof v==='number'||(!isNaN(parseFloat(v))&&h!=='问题'&&h!=='type'&&h!=='change_type'&&h!=='serial_no'))cls=' num';
-    if(h==='问题'||h==='problem'||h.indexOf('err')>=0||h.indexOf('issue')>=0)cls=' err';
-    if(h==='diff'||h==='差异'||h==='ratio')cls=' err num';
-    if(h==='expected_diff'||h==='actual_sum')cls=' num';
-    if(h==='detail_total'||h==='summary_value')cls=' num';
-    if(h==='balance_after_cur'||h==='balance_before_nxt')cls=' num';
-    if(h==='bet_amount'||h==='payout'||h==='valid_bet'||h==='rebate'||h==='expected_winlose'||h==='actual_winlose')cls=' num';
+    if(typeof v==='number'||(!isNaN(parseFloat(v))&&k!=='问题'&&k!=='type'&&k!=='change_type'&&k!=='serial_no'))cls=' num';
+    if(k==='问题'||k==='problem'||k.indexOf('err')>=0||k.indexOf('issue')>=0)cls=' err';
+    if(k==='diff'||k==='差异'||k==='ratio')cls=' err num';
+    if(k==='expected_diff'||k==='actual_sum')cls=' num';
+    if(k==='detail_total'||k==='summary_value')cls=' num';
+    if(k==='balance_after_cur'||k==='balance_before_nxt')cls=' num';
+    if(k==='bet_amount'||k==='payout'||k==='valid_bet'||k==='rebate'||k==='expected_winlose'||k==='actual_winlose')cls=' num';
     return '<td class="'+cls+'">'+esc(typeof v==='number'?fmt(v):String(v))+'</td>';
   }).join('')+'</tr>').join('');
   return '<table>'+h+b+'</table>';
@@ -236,7 +236,7 @@ function render(d){
           return o;
         });
         const headers=dd.headers.map((h,i)=>labels[i]||h);
-        itemsHTML+='<div class="detail" id="'+detailId+'">'+makeDetailTable(headers,rows)+'</div>';
+        itemsHTML+='<div class="detail" id="'+detailId+'">'+makeDetailTable(dd.headers,headers,rows)+'</div>';
       }else if(!chk.pass&&errs.length&&errs[0].msg){
         itemsHTML+='<div class="detail" id="'+detailId+'"><div style="color:var(--muted);font-size:13px;padding:8px 4px;">'+esc(errs[0].msg)+'</div></div>';
       }
