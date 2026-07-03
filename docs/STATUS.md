@@ -8,4 +8,4 @@
 | 4 | Code Review | ✅ |
 | 5 | Regression Testing | ✅ |
 | 6 | Feature Verification | ✅ |
-| 7 | User Acceptance | ⏳ (UAT — 等待部署後驗證) |
+| 7 | User Acceptance | ✅ |
