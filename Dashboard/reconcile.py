@@ -324,6 +324,8 @@ class Reconciliator:
         for ac in self.account_changes:
             ct = (ac['change_type'] or '').lower()
             if any(k in ct for k in ('游戏', '注单', '派彩', '投注', '遊戲')):
+                if any(k in ct for k in ('返水', '彩金', '活动', '活動', '奖励', '獎勵')):
+                    continue
                 ref = ac['ref_order']
                 if ref and ref not in order_nos and ref not in third_order_nos:
                     a5_errors.append({
