@@ -188,11 +188,12 @@ function render(d){
       let v=mi[key];
       if(v==null||v===undefined)v='—';
       else if(key==='register_date'||key==='first_deposit_date')v=esc(String(v));
+      else if(key==='total_bet_count')v=fmti(v);
       else if(typeof v==='number')v=fmt(v);
       else v=esc(String(v));
       memberHTML+='<div class="mi"><span class="ml">'+lab+'</span><span class="mv">'+v+'</span></div>';
     }
-    memberHTML+='<div class="mi" style="grid-column:1/-1"><span class="ml">会员总输赢</span><span class="mv" style="font-size:16px;color:'+(mi.total_winlose<0?'var(--green)':'var(--red)')+'">'+fmt(mi.total_winlose)+'</span></div>';
+    memberHTML+='<div class="mi" style="grid-column:1/-1"><span class="ml">会员总输赢</span><span class="mv" style="font-size:16px;color:'+(mi.total_winlose<0?'var(--red)':'var(--green)')+'">'+fmt(mi.total_winlose)+'</span></div>';
     memberHTML+='</div>';
   }
 
