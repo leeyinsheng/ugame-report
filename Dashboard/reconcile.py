@@ -239,86 +239,120 @@ class Reconciliator:
         bets = self.bets
         checks = {}
 
+        # A1: 本平台單號唯一性
+        order_counts = Counter(b['order_no'] for b in bets if b['order_no'])
         a1_errors = []
-        for b in bets:
-            if b['payout'] is not None and b['bet_amount'] is not None and b['winlose'] is not None:
-                expected = b['payout'] - b['bet_amount']
-                if abs(expected - b['winlose']) > 0.01:
-                    a1_errors.append({
-                        'order_no': b['order_no'],
-                        'bet_amount': b['bet_amount'],
-                        'payout': b['payout'],
-                        'expected_winlose': round(expected, 2),
-                        'actual_winlose': b['winlose'],
-                    })
+        for o, c in order_counts.items():
+            if c > 1:
+                a1_errors.append({'order_no': o, 'count': c})
         checks['A1'] = {
-            'name': '会员输赢公式',
+            'name': '本平台单号唯一性',
             'pass': len(a1_errors) == 0,
             'checked': len(bets),
             'errors': a1_errors,
         }
 
-        a2_errors = []
+        # A2: 三方單號唯一性（按供應商/場館分組）
+        venue_groups = {}
         for b in bets:
-            if b['payout'] is not None and b['payout'] < 0:
-                a2_errors.append({
-                    'order_no': b['order_no'],
-                    'bet_amount': b['bet_amount'],
-                    'payout': b['payout'],
-                })
+            tno = b.get('third_order_no')
+            if not tno:
+                continue
+            venue = (b.get('venue') or b.get('game_name') or '未知').strip()
+            if venue not in venue_groups:
+                venue_groups[venue] = Counter()
+            venue_groups[venue][tno] += 1
+        a2_errors = []
+        for venue, counts in venue_groups.items():
+            for tno, c in counts.items():
+                if c > 1:
+                    a2_errors.append({
+                        'venue': venue,
+                        'third_order_no': tno,
+                        'count': c,
+                    })
         checks['A2'] = {
-            'name': '派彩合理性',
+            'name': '三方单号唯一性(按供应商)',
             'pass': len(a2_errors) == 0,
             'checked': len(bets),
             'errors': a2_errors,
         }
 
+        # A3: 真人視訊/彩票/體育的注單投注金額不可為0
+        _target_keywords = [
+            '视讯', '視訊', '真人', '彩票', '体育', '體育',
+        ]
         a3_errors = []
+        a3_checked = 0
         for b in bets:
-            if b['valid_bet'] is not None and b['bet_amount'] is not None:
-                if b['bet_amount'] > 0 and b['valid_bet'] > b['bet_amount'] + 0.01:
+            venue = (b.get('venue') or b.get('game_name') or '').strip()
+            if any(k in venue for k in _target_keywords):
+                a3_checked += 1
+                if b['bet_amount'] is not None and b['bet_amount'] == 0:
                     a3_errors.append({
                         'order_no': b['order_no'],
-                        'bet_amount': b['bet_amount'],
-                        'valid_bet': b['valid_bet'],
+                        'venue': venue,
+                        'bet_amount': 0,
                     })
         checks['A3'] = {
-            'name': '有效打码',
+            'name': '特定游戏投注金额非零',
             'pass': len(a3_errors) == 0,
-            'checked': len(bets),
+            'checked': a3_checked,
             'errors': a3_errors,
         }
 
+        # A4: 派彩合理性（派彩金額 ≥ 0）
         a4_errors = []
         for b in bets:
-            if b['bet_time'] and b['payout_time']:
-                if b['payout_time'] < b['bet_time']:
-                    a4_errors.append({
-                        'order_no': b['order_no'],
-                        'bet_time': b['bet_time'],
-                        'payout_time': b['payout_time'],
-                    })
+            if b['payout'] is not None and b['payout'] < 0:
+                a4_errors.append({
+                    'order_no': b['order_no'],
+                    'bet_amount': b['bet_amount'],
+                    'payout': b['payout'],
+                })
         checks['A4'] = {
-            'name': '时间顺序',
+            'name': '派彩合理性',
             'pass': len(a4_errors) == 0,
             'checked': len(bets),
             'errors': a4_errors,
         }
 
-        order_counts = Counter(b['order_no'] for b in bets if b['order_no'])
-        third_counts = Counter(b['third_order_no'] for b in bets if b['third_order_no'])
+        # A5: 遊戲帳變關聯（帳變中遊戲類型的關聯單號對應到注單）
+        order_nos = set(b['order_no'] for b in bets if b['order_no'])
+        third_order_nos = set(b['third_order_no'] for b in bets if b['third_order_no'])
         a5_errors = []
-        for o, c in order_counts.items():
-            if c > 1:
-                a5_errors.append({'order_no': o, 'count': c, 'type': '本平台单号'})
-        for o, c in third_counts.items():
-            if c > 1:
-                a5_errors.append({'order_no': o, 'count': c, 'type': '三方单号'})
+        for ac in self.account_changes:
+            ct = (ac['change_type'] or '').lower()
+            if any(k in ct for k in ('游戏', '注单', '派彩', '投注', '遊戲')):
+                ref = ac['ref_order']
+                if ref and ref not in order_nos and ref not in third_order_nos:
+                    a5_errors.append({
+                        'serial_no': ac['serial_no'],
+                        'change_type': ac['change_type'],
+                        'ref_order': ref,
+                    })
         checks['A5'] = {
-            'name': '单号唯一性',
+            'name': '游戏帐变关联',
             'pass': len(a5_errors) == 0,
-            'checked': len(bets),
+            'checked': len(self.account_changes),
             'errors': a5_errors,
+        }
+
+        # A6: 時間順序（派彩時間 ≥ 投注時間）
+        a6_errors = []
+        for b in bets:
+            if b['bet_time'] and b['payout_time']:
+                if b['payout_time'] < b['bet_time']:
+                    a6_errors.append({
+                        'order_no': b['order_no'],
+                        'bet_time': b['bet_time'],
+                        'payout_time': b['payout_time'],
+                    })
+        checks['A6'] = {
+            'name': '时间顺序',
+            'pass': len(a6_errors) == 0,
+            'checked': len(bets),
+            'errors': a6_errors,
         }
 
         return checks

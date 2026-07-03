@@ -157,11 +157,12 @@ function makeDetailTable(keys,labels,rows){
 }
 
 const CHECK_DETAILS={
-  A1:{headers:['order_no','bet_amount','payout','expected_winlose','actual_winlose'],labels:['单号','投注金额','派彩金额','应计输赢','实际输赢']},
-  A2:{headers:['order_no','bet_amount','payout'],labels:['单号','投注金额','派彩金额']},
-  A3:{headers:['order_no','bet_amount','valid_bet'],labels:['单号','投注金额','有效打码']},
-  A4:{headers:['order_no','bet_time','payout_time'],labels:['单号','投注时间','派彩时间']},
-  A5:{headers:['order_no','count','type'],labels:['单号','重复次数','类型']},
+  A1:{headers:['order_no','count'],labels:['本平台单号','重复次数']},
+  A2:{headers:['venue','third_order_no','count'],labels:['供应商','三方单号','重复次数']},
+  A3:{headers:['order_no','venue','bet_amount'],labels:['本平台单号','游戏场馆','投注金额']},
+  A4:{headers:['order_no','bet_amount','payout'],labels:['本平台单号','投注金额','派彩金额']},
+  A5:{headers:['serial_no','change_type','ref_order'],labels:['帐变流水号','帐变类型','关联单号']},
+  A6:{headers:['order_no','bet_time','payout_time'],labels:['本平台单号','投注时间','派彩时间']},
   B1:{headers:['serial_no','change_type','ref_order'],labels:['流水号','帐变类型','关联单号']},
 };
 
