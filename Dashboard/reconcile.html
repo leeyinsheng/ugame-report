@@ -163,29 +163,37 @@ const CHECK_DETAILS={
   A4:{headers:['order_no','bet_time','payout_time'],labels:['单号','投注时间','派彩时间']},
   A5:{headers:['order_no','count','type'],labels:['单号','重复次数','类型']},
   B1:{headers:['serial_no','change_type','ref_order'],labels:['流水号','帐变类型','关联单号']},
-  C1:{headers:['serial_no','change_type','ref_order'],labels:['流水号','帐变类型','关联单号']},
-  C2:{headers:['serial_no_cur','serial_no_nxt','balance_after_cur','balance_before_nxt'],labels:['前笔流水号','后笔流水号','前笔后余额','后笔前余额']},
-  C3:{headers:['first_balance','last_balance','expected_diff','actual_sum','diff'],labels:['期初余额','期末余额','应计差额','实际总和','差异']},
-  D1:{headers:['order_no','valid_bet','rebate','ratio'],labels:['单号','有效打码','返水','比例(%)']},
-  E1:{headers:['detail_total','summary_value','diff'],labels:['明细加总','汇总值','差异']},
-  E2:{headers:['detail_total','summary_value','diff'],labels:['明细加总','汇总值','差异']},
-  E3:{headers:['detail_total','summary_value','diff'],labels:['明细加总','汇总值','差异']},
-  E4:{headers:['detail_total','summary_value','diff'],labels:['明细加总','汇总值','差异']},
-  E5:{headers:['detail_total','summary_value','diff'],labels:['明细加总','汇总值','差异']},
 };
 
 function render(d){
   const box=document.getElementById('result');
 
-  const mi=d.member_info;
+  const mi=d.member_info||{};
   let memberHTML='';
-  if(mi){
-    memberHTML='<div class="member-info">'+
-      '<div class="mi"><span class="ml">会员 ID</span><span class="mv">'+esc(mi.member_id)+'</span></div>'+
-      (mi.account?'<div class="mi"><span class="ml">账号</span><span class="mv">'+esc(mi.account)+'</span></div>':'')+
-      (mi.agent?'<div class="mi"><span class="ml">上级代理</span><span class="mv">'+esc(mi.agent)+'</span></div>':'')+
-      (mi.register_date?'<div class="mi"><span class="ml">注册日期</span><span class="mv">'+esc(mi.register_date)+'</span></div>':'')+
-    '</div>';
+  if(mi.member_id){
+    const fields=[
+      ['会员 ID','member_id'],
+      ['上级代理','agent'],
+      ['注册日期时间','register_date'],
+      ['首次充值日期时间','first_deposit_date'],
+      ['总注单量','total_bet_count'],
+      ['充值总金额','total_deposit_amount'],
+      ['提现总金额','total_withdraw_amount'],
+      ['总有效打码','total_valid_bet'],
+      ['返水总金额','total_rebate'],
+      ['已领取彩金总金额','total_bonus'],
+    ];
+    memberHTML='<div class="member-info">';
+    for(const [lab,key] of fields){
+      let v=mi[key];
+      if(v==null||v===undefined)v='—';
+      else if(key==='register_date'||key==='first_deposit_date')v=esc(String(v));
+      else if(typeof v==='number')v=fmt(v);
+      else v=esc(String(v));
+      memberHTML+='<div class="mi"><span class="ml">'+lab+'</span><span class="mv">'+v+'</span></div>';
+    }
+    memberHTML+='<div class="mi" style="grid-column:1/-1"><span class="ml">会员总输赢</span><span class="mv" style="font-size:16px;color:'+(mi.total_winlose<0?'var(--green)':'var(--red)')+'">'+fmt(mi.total_winlose)+'</span></div>';
+    memberHTML+='</div>';
   }
 
   const st=d.stats||{};
@@ -193,7 +201,6 @@ function render(d){
     '<div class="st"><div class="sn">'+fmti(st.bet_count)+'</div><div class="sl">注单</div></div>'+
     '<div class="st"><div class="sn">'+fmti(st.deposit_count)+'</div><div class="sl">充值</div></div>'+
     '<div class="st"><div class="sn">'+fmti(st.withdraw_count)+'</div><div class="sl">提现</div></div>'+
-    '<div class="st"><div class="sn">'+fmti(st.account_change_count)+'</div><div class="sl">帐变</div></div>'+
     '<div class="st"><div class="sn">'+fmt(st.total_bet_amount)+'</div><div class="sl">总投注</div></div>'+
     '<div class="st"><div class="sn" style="color:'+(st.total_winlose<0?'var(--red)':'var(--blue)')+'">'+fmt(st.total_winlose)+'</div><div class="sl">总输赢</div></div>'+
   '</div>';
@@ -205,7 +212,7 @@ function render(d){
     '<div class="osmall">通过 '+sm.passed+' 项 · 失败 '+sm.failed+' 项</div>'+
   '</div>';
 
-  const CAT_NAMES={A:'注单核对',B:'充值提现核对',C:'帐变核对',D:'返水核对',E:'会员汇总核对'};
+  const CAT_NAMES={A:'注单核对',B:'充值提现核对'};
   let cardsHTML='';
   for(const [cid,cat] of Object.entries(d.categories||{})){
     const chks=cat.checks||{};
@@ -249,7 +256,7 @@ function render(d){
   box.innerHTML=
     '<div class="card"><h2><span class="bar"></span>会员信息</h2>'+memberHTML+statsHTML+overallHTML+'</div>'+
     cardsHTML+
-    '<div class="note">每次核对实时从 OSS 扫描全部原始 CSV 文件<br>全部 15 项检查 · 5 大类（注单 / 充值提现 / 帐变 / 返水 / 会员汇总）</div>';
+    '<div class="note">每次核对实时从 OSS 扫描全部原始 CSV 文件<br>全部 6 项检查 · 2 大类（注单 / 充值提现）</div>';
   box.style.display='block';
 }
 

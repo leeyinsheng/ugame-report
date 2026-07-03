@@ -114,9 +114,6 @@ class Reconciliator:
         cats = {}
         cats['A'] = self._check_betting()
         cats['B'] = self._check_deposit_withdraw()
-        cats['C'] = self._check_account_change()
-        cats['D'] = self._check_rebate()
-        cats['E'] = self._check_member_summary()
         return self._build(cats)
 
     def _collect_data(self):
@@ -355,145 +352,13 @@ class Reconciliator:
         }
         return checks
 
-    def _check_account_change(self):
-        checks = {}
-        order_nos = set()
-        for b in self.bets:
-            if b['order_no']:
-                order_nos.add(b['order_no'])
-
-        c1_errors = []
-        for ac in self.account_changes:
-            ct = (ac['change_type'] or '').lower()
-            if any(k in ct for k in ('游戏', '注单', '派彩', '投注')):
-                ref = ac['ref_order']
-                if ref and ref not in order_nos:
-                    c1_errors.append({
-                        'serial_no': ac['serial_no'],
-                        'change_type': ac['change_type'],
-                        'ref_order': ref,
-                    })
-        checks['C1'] = {
-            'name': '游戏关联',
-            'pass': len(c1_errors) == 0,
-            'checked': len(self.account_changes),
-            'errors': c1_errors,
-        }
-
-        sorted_ac = sorted(self.account_changes, key=lambda x: x['change_time'] or '')
-        c2_errors = []
-        for i in range(len(sorted_ac) - 1):
-            cur = sorted_ac[i]
-            nxt = sorted_ac[i + 1]
-            if cur['balance_after'] is not None and nxt['balance_before'] is not None:
-                if abs(cur['balance_after'] - nxt['balance_before']) > 0.01:
-                    c2_errors.append({
-                        'serial_no_cur': cur['serial_no'],
-                        'serial_no_nxt': nxt['serial_no'],
-                        'balance_after_cur': cur['balance_after'],
-                        'balance_before_nxt': nxt['balance_before'],
-                    })
-        checks['C2'] = {
-            'name': '余额连续性',
-            'pass': len(c2_errors) == 0,
-            'checked': max(0, len(sorted_ac) - 1),
-            'errors': c2_errors,
-        }
-
-        c3_errors = []
-        if len(sorted_ac) >= 2:
-            first = sorted_ac[0]
-            last = sorted_ac[-1]
-            if first['balance_before'] is not None and last['balance_after'] is not None:
-                total_change = sum((ac['amount'] or 0) for ac in sorted_ac)
-                expected_diff = last['balance_after'] - first['balance_before']
-                if abs(total_change - expected_diff) > 0.01:
-                    c3_errors.append({
-                        'first_balance': first['balance_before'],
-                        'last_balance': last['balance_after'],
-                        'expected_diff': round(expected_diff, 2),
-                        'actual_sum': round(total_change, 2),
-                        'diff': round(total_change - expected_diff, 2),
-                    })
-        checks['C3'] = {
-            'name': '帐变总和',
-            'pass': len(c3_errors) == 0,
-            'checked': len(sorted_ac),
-            'errors': c3_errors,
-        }
-        return checks
-
-    def _check_rebate(self):
-        checks = {}
-        d1_errors = []
-        for b in self.bets:
-            if b['rebate'] is not None and b['valid_bet'] is not None and b['valid_bet'] > 0:
-                ratio = b['rebate'] / b['valid_bet']
-                if ratio < 0 or ratio > 0.02:
-                    d1_errors.append({
-                        'order_no': b['order_no'],
-                        'valid_bet': b['valid_bet'],
-                        'rebate': b['rebate'],
-                        'ratio': round(ratio * 100, 4),
-                    })
-        checks['D1'] = {
-            'name': '返水比例',
-            'pass': len(d1_errors) == 0,
-            'checked': len(self.bets),
-            'errors': d1_errors,
-        }
-        return checks
-
-    def _check_member_summary(self):
-        checks = {}
-        s = self.member_summary
-        if s is None:
-            for k in ['E1', 'E2', 'E3', 'E4', 'E5']:
-                checks[k] = {'name': '', 'pass': False, 'checked': 0,
-                             'errors': [{'msg': '未找到该会员的汇总数据'}]}
-            checks['E1']['name'] = '充值总额'
-            checks['E2']['name'] = '提现总额'
-            checks['E3']['name'] = '输赢总额'
-            checks['E4']['name'] = '注单总数'
-            checks['E5']['name'] = '有效打码'
-            return checks
-
-        total_deposit = sum((d['amount'] or 0) for d in self.deposits)
-        total_withdraw = sum((w['amount'] or 0) for w in self.withdrawals)
-        total_winlose = sum((b['winlose'] or 0) for b in self.bets)
-        total_bet_count = len(self.bets)
-        total_valid_bet = sum((b['valid_bet'] or 0) for b in self.bets)
-
-        pairs = [
-            ('E1', '充值总额', total_deposit, s['total_deposit_amount']),
-            ('E2', '提现总额', total_withdraw, s['total_withdraw_amount']),
-            ('E3', '输赢总额', total_winlose, s['total_winlose']),
-            ('E4', '注单总数', total_bet_count, s['total_bet_count']),
-            ('E5', '有效打码', total_valid_bet, s['total_valid_bet']),
-        ]
-        for code, cname, detail_total, summary_val in pairs:
-            errs = []
-            if summary_val is not None and abs(detail_total - summary_val) > 0.01:
-                errs.append({
-                    'detail_total': round(detail_total, 2) if isinstance(detail_total, float) else detail_total,
-                    'summary_value': round(summary_val, 2) if isinstance(summary_val, float) else summary_val,
-                    'diff': round(detail_total - summary_val, 2) if isinstance(detail_total, float) else int(detail_total - summary_val),
-                })
-            checks[code] = {
-                'name': cname,
-                'pass': len(errs) == 0,
-                'checked': 1,
-                'errors': errs,
-            }
-        return checks
 
     def _build(self, cats):
-        all_checks = []
         total_passed = 0
         total_failed = 0
         cat_summaries = {}
 
-        for cat_id in ['A', 'B', 'C', 'D', 'E']:
+        for cat_id in ['A', 'B']:
             checks = cats.get(cat_id, {})
             cat_passed = sum(1 for c in checks.values() if c['pass'])
             cat_failed = sum(1 for c in checks.values() if not c['pass'])
@@ -505,31 +370,49 @@ class Reconciliator:
             }
             total_passed += cat_passed
             total_failed += cat_failed
-            all_checks.extend(checks.values())
 
         mi = self.member_summary or {}
         stats = {
             'bet_count': len(self.bets),
             'deposit_count': len(self.deposits),
             'withdraw_count': len(self.withdrawals),
-            'account_change_count': len(self.account_changes),
             'total_bet_amount': round(sum((b['bet_amount'] or 0) for b in self.bets), 2),
             'total_payout': round(sum((b['payout'] or 0) for b in self.bets), 2),
             'total_winlose': round(sum((b['winlose'] or 0) for b in self.bets), 2),
         }
 
-        member_info = None
-        if mi:
-            member_info = {
-                'member_id': self.member_id,
-                'account': mi.get('account'),
-                'agent': mi.get('agent'),
-                'register_date': mi.get('register_date'),
-                'total_deposit_amount': mi.get('total_deposit_amount'),
-                'total_withdraw_amount': mi.get('total_withdraw_amount'),
-                'total_valid_bet': mi.get('total_valid_bet'),
-                'total_winlose': mi.get('total_winlose'),
-            }
+        first_deposit_date = None
+        for d in self.deposits:
+            t = d.get('complete_time')
+            if t and (first_deposit_date is None or t < first_deposit_date):
+                first_deposit_date = t
+
+        total_rebate = 0.0
+        total_bonus = 0.0
+        for ac in self.account_changes:
+            ct = (ac['change_type'] or '').lower()
+            if '返水' in ct:
+                total_rebate += (ac['amount'] or 0)
+            elif any(k in ct for k in ('彩金', '活动', '活動', '奖励', '獎勵')):
+                total_bonus += (ac['amount'] or 0)
+
+        total_bet_winlose = round(
+            sum(((b['payout'] or 0) - (b['bet_amount'] or 0)) for b in self.bets), 2)
+
+        member_info = {
+            'member_id': self.member_id,
+            'account': mi.get('account'),
+            'agent': mi.get('agent'),
+            'register_date': mi.get('register_date'),
+            'first_deposit_date': first_deposit_date,
+            'total_bet_count': len(self.bets),
+            'total_deposit_amount': mi.get('total_deposit_amount'),
+            'total_withdraw_amount': mi.get('total_withdraw_amount'),
+            'total_valid_bet': mi.get('total_valid_bet'),
+            'total_rebate': round(total_rebate, 2),
+            'total_bonus': round(total_bonus, 2),
+            'total_winlose': total_bet_winlose,
+        }
 
         return {
             'member_id': self.member_id,
@@ -543,8 +426,5 @@ class Reconciliator:
             'categories': {
                 'A': {'name': '注单核对', 'checks': cats.get('A', {}), **cat_summaries['A']},
                 'B': {'name': '充值提现核对', 'checks': cats.get('B', {}), **cat_summaries['B']},
-                'C': {'name': '帐变核对', 'checks': cats.get('C', {}), **cat_summaries['C']},
-                'D': {'name': '返水核对', 'checks': cats.get('D', {}), **cat_summaries['D']},
-                'E': {'name': '会员汇总核对', 'checks': cats.get('E', {}), **cat_summaries['E']},
             },
         }
