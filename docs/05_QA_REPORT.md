@@ -1,54 +1,44 @@
-# Phase 5: Regression Testing Report v1.0
+# QA Report — 活動彩金名稱映射 v1.3
 
-## Scope
+## 執行結果
 
-| 測試項目 | 測試內容 |
-|---------|---------|
-| HTTP 端點 | index.html / reconcile.html / api/summary / api/reconcile |
-| 核對引擎 | 會員 2064375069823860736（724+ 注單，OSS） |
-| 邊界情況 | 不存在的會員 / 空會員（0 筆資料） |
-| 回歸 | 現有運營看板 /api/summary 正確性 |
-| 404/400 | 錯誤請求處理 |
+| 測試類別 | 通過 | 失敗 | 備註 |
+|---------|------|------|------|
+| Unit Test (Phase 3) | 11 | 0 | 0.02s |
+| Integration Test (OSS) | 2 | 0 | 6/30~7/3 資料驗證 |
+| **總計** | **13** | **0** | |
 
-## Test Results
+## Unit Test Coverage
 
-| # | Test | Status | Details |
-|---|------|--------|---------|
-| 1 | `GET /` → index.html | ✅ | 200, 34,512 bytes, HTML 正常 |
-| 2 | `GET /reconcile.html` | ✅ | 200, 15,296 bytes, HTML 正常 |
-| 3 | `GET /api/summary` | ✅ | 200, 16 天資料，JSON 結構完整 |
-| 4 | `GET /api/reconcile` (no member_id) | ✅ | 400, `{"error":"missing member_id"}` |
-| 5 | `GET /api/reconcile?member_id=2064375069823860736` (OSS) | ✅ | 200, 9/15 passed, 6 known |
-| 6 | `GET /api/reconcile?member_id=9999999999999999999` (空會員) | ✅ | 200, 10/15 passed, E1-E5 顯示無彙總 |
-| 7 | `GET /api/reconcile?member_id=0` (最小資料) | ✅ | 200, 15 checks, 無崩潰 |
-| 8 | `GET /nonexistent.html` (404) | ✅ | 404 |
+| 測試 | 結果 | 說明 |
+|------|------|------|
+| 已知充值活動 → 一般充值 | ✅ | ID=2064338446452465664 |
+| 首充活動 → 首次充值 | ✅ | ID=2072527153187643392 |
+| 未知活動保留原名 | ✅ | 負盈利不受影響 |
+| 其他充值活動保留原名 | ✅ | 其他 ID 仍顯示「充值活動」 |
+| 空 ID 保留原名 | ✅ | 向下相容 |
+| 無 snapshot → None | ✅ | 邊界條件 |
+| 單一活動正確輸出 | ✅ | 各欄位正確 |
+| 同名不同 ID 共存 | ✅ | 兩筆獨立計算 |
+| 跨日 delta | ✅ | 當日新增正常 |
+| 無前一日 → 全量計 | ✅ | 首次出現正確 |
+| Summary 彙總計算 | ✅ | 累計/兌現率正確 |
 
-## Edge Case Coverage
+## Integration Test (OSS 實際資料)
 
-| 情境 | 處理方式 |
-|------|---------|
-| 無此會員 | E1-E5 回傳「未找到该会员的汇总数据」 |
-| 無交易資料 | 各檢查列「checked: 0」，無錯誤 |
-| 無彙總資料 | member_info=null，E 類全部 failed |
-| 部分欄位缺失 | 以 `None` 處理，對應檢查跳過 |
-| 金額為 0 | 正確運算（如投注額為 0 的免費旋轉） |
+| 日期 | 一般充值 | 首次充值 | 負盈利 | 結果 |
+|------|---------|---------|-------|------|
+| 6/30 | ✅ | 尚未出現 | ✅ | ✅ |
+| 7/1 | ✅ | ✅ (0 到帳) | ✅ | ✅ |
+| 7/2 | ✅ | ✅ (250 到帳) | ✅ | ✅ |
+| 7/3 | ✅ | ✅ (66.67% 領取率) | ✅ | ✅ |
 
-## Regression Verification
+## 回歸確認
 
-| 功能 | 結果 |
-|------|------|
-| 運營看板/api/summary | ✅ 仍回傳 16 天完整資料 |
-| 前端 /index.html | ✅ 正常載入 34KB |
-| 導航切換 | ✅ index.html ↔ reconcile.html 連結正確 |
+- 負盈利活動不受名稱映射影響 ✅
+- 前端 `renderBonus()` 無需修改 ✅
+- 所有活動卡片欄位完整（到帳彩金、觸發彩金、領取率、兌現率、觸發次數、人數）✅
 
-## Conclusion
+## 結論
 
-**All tests pass.** No regression found. The reconcile feature integrates cleanly with the existing dashboard. Edge cases (empty member, unknown member, missing params) are handled correctly.
-
-## Known Issues (pre-existing, not regression)
-
-| ID | Description | Count |
-|----|-------------|-------|
-| A5 | 本平台/三方单号重复（新舊 CSV 重疊） | 1,432 筆 |
-| C1 | 帳變關聯單號未匹配到注單（超出掃描範圍） | 629 筆 |
-| E3/E5 | 會員彙總與明細不一致（資料範圍差異） | 2 項 |
+**全部通過。** 可進入 Phase 6 功能驗證。

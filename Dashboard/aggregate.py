@@ -138,7 +138,7 @@ def aggregate(source):
     cash = {}        # 订单号    -> (日, 充值, 提现, 会员ID)
     member_rows = None      # 取最新的会员快照（缓存其行）
     member_key = None       # 对应排序键（mtime / last_modified）
-    activity_snaps = {}     # 快照日 -> {活动名称: {触发,到帐,次数,触发人数,领取人数,领取率}}（累计值）
+    activity_snaps = {}     # 快照日 -> {(活动名称, 活动ID): {触发,到帐,次数,触发人数,领取人数,领取率}}（累计值）
 
     for name, order_key, f in source.iter_csv():
         with f:
@@ -152,9 +152,11 @@ def aggregate(source):
                     m = activity_snaps.setdefault(snap, {})
                     for row in r:
                         nm = (pick(row, "活动名称", "活動名稱") or "").strip()
+                        aid = (pick(row, "活动 ID", "活動 ID", "活動ID") or "").strip()
                         if not nm:
                             continue
-                        m[nm] = {
+                        key = (nm, aid)
+                        m[key] = {
                             "触发": num(pick(row, "触发彩金总金额", "觸發彩金總金額")),
                             "到帐": num(pick(row, "到帐彩金总金额", "到帳彩金總金額")),
                             "次数": int(num(pick(row, "触发彩金总次数", "觸發彩金總次數"))),
@@ -384,6 +386,18 @@ def _retention(cohort, active_days, covered, max_n=7):
     return out
 
 
+# 活动ID -> 显示名称映射
+KNOWN_ACTIVITY_NAMES = {
+    ("充值活动", "2064338446452465664"): "一般充值",
+    ("充值活动", "2072527153187643392"): "首次充值",
+}
+
+
+def _activity_display(key):
+    nm, aid = key
+    return KNOWN_ACTIVITY_NAMES.get(key, nm)
+
+
 def _bonus_for(snaps, d):
     """活动彩金领取情况：取截至 d 的最新快照(累计)，并与前一快照相减得当日新增。"""
     if not snaps:
@@ -410,12 +424,12 @@ def _bonus_for(snaps, d):
     tot_credit = tot_trig = 0.0
     tot_claim_people = 0
     tot_new_credit = 0.0
-    for nm, s in cur_map.items():
-        p = prev_map.get(nm, {})
+    for key, s in cur_map.items():
+        p = prev_map.get(key, {})
         credit, trig = s["到帐"], s["触发"]
         new_credit = credit - p.get("到帐", 0.0)
         items.append({
-            "活动": nm,
+            "活动": _activity_display(key),
             "到帐彩金": round(credit, 2), "触发彩金": round(trig, 2),
             "兑现率": round(credit / trig * 100, 2) if trig else 0.0,
             "触发人数": s["触发人数"], "领取人数": s["领取人数"],
