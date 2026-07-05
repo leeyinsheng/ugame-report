@@ -388,7 +388,7 @@ def _retention(cohort, active_days, covered, max_n=7):
 
 # 活动ID -> 显示名称映射
 KNOWN_ACTIVITY_NAMES = {
-    ("充值活动", "2064338446452465664"): "一般充值",
+    ("充值活动", "2064338446452465664"): "每日充值回馈",
     ("充值活动", "2072527153187643392"): "新人首充100%豪礼",
     ("充值活动", "2072532512957681664"): "每日充值回馈",
     ("负盈利", "2064364752562868224"): "老虎救援金",
@@ -423,25 +423,41 @@ def _bonus_for(snaps, d):
     cur_map = snaps[cur]
     prev_map = snaps.get(prev, {}) if prev else {}
 
+    merged = {}
+    for key, s in cur_map.items():
+        p = prev_map.get(key, {})
+        display = _activity_display(key)
+        g = merged.setdefault(display, {
+            "到帐彩金": 0.0, "触发彩金": 0.0,
+            "触发人数": 0, "领取人数": 0, "触发次数": 0,
+            "当日新增到帐": 0.0, "当日新增次数": 0,
+        })
+        g["到帐彩金"] += s["到帐"]
+        g["触发彩金"] += s["触发"]
+        g["触发人数"] += s["触发人数"]
+        g["领取人数"] += s["领取人数"]
+        g["触发次数"] += s["次数"]
+        g["当日新增到帐"] += s["到帐"] - p.get("到帐", 0.0)
+        g["当日新增次数"] += s["次数"] - p.get("次数", 0)
+
     items = []
     tot_credit = tot_trig = 0.0
     tot_claim_people = 0
     tot_new_credit = 0.0
-    for key, s in cur_map.items():
-        p = prev_map.get(key, {})
-        credit, trig = s["到帐"], s["触发"]
-        new_credit = credit - p.get("到帐", 0.0)
+    for display, g in merged.items():
+        credit, trig = g["到帐彩金"], g["触发彩金"]
         items.append({
-            "活动": _activity_display(key),
+            "活动": display,
             "到帐彩金": round(credit, 2), "触发彩金": round(trig, 2),
             "兑现率": round(credit / trig * 100, 2) if trig else 0.0,
-            "触发人数": s["触发人数"], "领取人数": s["领取人数"],
-            "领取率": s["领取率"], "触发次数": s["次数"],
-            "当日新增到帐": round(new_credit, 2),
-            "当日新增次数": s["次数"] - p.get("次数", 0),
+            "触发人数": g["触发人数"], "领取人数": g["领取人数"],
+            "领取率": round(g["领取人数"] / g["触发人数"] * 100, 2) if g["触发人数"] else 0.0,
+            "触发次数": g["触发次数"],
+            "当日新增到帐": round(g["当日新增到帐"], 2),
+            "当日新增次数": g["当日新增次数"],
         })
         tot_credit += credit; tot_trig += trig
-        tot_claim_people += s["领取人数"]; tot_new_credit += new_credit
+        tot_claim_people += g["领取人数"]; tot_new_credit += g["当日新增到帐"]
     items.sort(key=lambda x: x["到帐彩金"], reverse=True)
     return {
         "as_of": cur,

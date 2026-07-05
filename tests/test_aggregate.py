@@ -6,8 +6,8 @@ from aggregate import _activity_display, _bonus_for
 
 
 class TestActivityDisplay:
-    def test_known_deposit_renamed_to_general(self):
-        assert _activity_display(("充值活动", "2064338446452465664")) == "一般充值"
+    def test_known_deposit_renamed_to_daily_recharge(self):
+        assert _activity_display(("充值活动", "2064338446452465664")) == "每日充值回馈"
 
     def test_first_deposit_renamed(self):
         assert _activity_display(("充值活动", "2072527153187643392")) == "新人首充100%豪礼"
@@ -69,8 +69,36 @@ class TestBonusFor:
         assert result is not None
         assert len(result["list"]) == 2
         names = [item["活动"] for item in result["list"]]
-        assert "一般充值" in names
+        assert "每日充值回馈" in names
         assert "新人首充100%豪礼" in names
+
+    def test_same_display_name_merged(self):
+        snaps = {
+            "2026-07-03": {
+                ("充值活动", "2064338446452465664"): {
+                    "触发": 1000.0, "到帐": 800.0, "次数": 50,
+                    "触发人数": 30, "领取人数": 25, "领取率": 83.33,
+                },
+                ("充值活动", "2072532512957681664"): {
+                    "触发": 400.0, "到帐": 350.0, "次数": 15,
+                    "触发人数": 10, "领取人数": 8, "领取率": 80.0,
+                },
+            },
+        }
+        result = _bonus_for(snaps, "2026-07-03")
+        assert result is not None
+        assert len(result["list"]) == 1, "same display name should merge into 1 item"
+        item = result["list"][0]
+        assert item["活动"] == "每日充值回馈"
+        assert item["到帐彩金"] == 1150.0
+        assert item["触发彩金"] == 1400.0
+        assert item["触发人数"] == 40
+        assert item["领取人数"] == 33
+        assert item["兑现率"] == pytest.approx(1150 / 1400 * 100, 0.01)
+        assert item["领取率"] == pytest.approx(33 / 40 * 100, 0.01)
+        assert item["触发次数"] == 65
+        assert item["当日新增到帐"] == 1150.0
+        assert item["当日新增次数"] == 65
 
     def test_daily_delta(self):
         snaps = {
