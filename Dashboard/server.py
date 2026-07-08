@@ -58,23 +58,7 @@ class Handler(BaseHTTPRequestHandler):
                 self._send(500, json.dumps({"error": str(e)}).encode("utf-8"),
                            "application/json; charset=utf-8")
             return
-        if path.startswith("/api/reconcile"):
-            try:
-                params = parse_qs(urlparse(self.path).query)
-                member_id = (params.get("member_id") or [""])[0]
-                if not member_id:
-                    self._send(400, json.dumps({"error": "missing member_id"}).encode("utf-8"),
-                               "application/json; charset=utf-8")
-                    return
-                import reconcile as rec_mod
-                r = rec_mod.Reconciliator(SOURCE, member_id)
-                result = r.run()
-                payload = json.dumps(result, ensure_ascii=False).encode("utf-8")
-                self._send(200, payload, "application/json; charset=utf-8")
-            except Exception as e:  # noqa: BLE001
-                self._send(500, json.dumps({"error": str(e)}).encode("utf-8"),
-                           "application/json; charset=utf-8")
-            return
+
         if path in ("/", "/index.html"):
             return self._file("index.html", "text/html; charset=utf-8")
         # 静态文件（限定在 BASE 内，禁止越界）
