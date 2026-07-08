@@ -1,21 +1,14 @@
-# Phase 5 QA Report
+# Phase 5 測試計畫 & QA Report (v1.6)
+
+## 測試案例
+
+| # | 測試 | 預期 | 結果 |
+|---|------|------|------|
+| 1 | index.html 無「数据核对」連結 | grep 無匹配 | PASS |
+| 2 | server.py 無 `/api/reconcile` 路由 | grep 無匹配 | PASS |
+| 3 | `reconcile` 非 server.py 頂層 import | 無殘留 import | PASS |
+| 4 | 既有 14 項 aggregate 單元測試 | 全部通過 | PASS |
 
 ## 結果
 
-**14/14 PASS** ✅
-
-| 套件 | 測試數 | 通過 |
-|------|--------|------|
-| TestActivityDisplay | 7 | 7 |
-| TestBonusFor | 7 | 7 |
-| **總計** | **14** | **14** |
-
-## 關鍵驗證
-
-- 2064338446452465664 + 2072532512957681664 同為「每日充值回馈」且數據合併 ✅
-- `test_same_display_name_merged` 驗證：到帳 800+350=1150，觸發 1000+400=1400，人數 30+10=40，兌現率 82.14% ✅
-- 不同名活動（如新人首充 vs 每日充值回馈）不受影響 ✅
-
-## 結論
-
-**PASS** — 進入 Phase 6 功能驗證。
+**14/14 PASS** ✅ — 無回歸問題。
