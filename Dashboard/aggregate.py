@@ -424,6 +424,7 @@ def _monthly_stats(days, rev, cp, reg_by_day, fc_by_day, today_ym=None):
 
         result.append(entry)
 
+    result.reverse()
     return result
 
 
@@ -502,6 +503,7 @@ def _weekly_stats(days, rev, cp, reg_by_day, fc_by_day, today=None):
 
         result.append(entry)
 
+    result.reverse()
     return result
 
 

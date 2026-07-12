@@ -175,7 +175,8 @@ class TestMonthlyStats:
             {day1: 2, day2: 1, day3: 3},
         )
         assert len(result) == 2
-        jun = result[0]
+        jun = result[1]  # newer first, so "2026-06" is now result[1]
+        jul = result[0]
         assert jun["月份"] == "2026-06"
         assert jun["投注总额"] == 300.0
         assert jun["有效打码"] == 240.0
@@ -209,7 +210,8 @@ class TestMonthlyStats:
             {}, {"2026-06-01": 10, "2026-07-01": 20}, {},
         )
         assert len(result) == 2
-        hb = result[1]["环比"]
+        jul = result[0]  # newest first
+        hb = jul["环比"]
         assert hb["投注总额"] == 100.0       # (200/100-1)*100
         assert hb["新增注册"] == 100.0       # (20/10-1)*100
         assert hb["活跃会员"] == 0.0         # 1->1 no change
@@ -221,7 +223,7 @@ class TestMonthlyStats:
              day3: _rv(100, 80, 50, 0, 0, {"u1"})},
             {}, {}, {},
         )
-        assert result[1]["环比"]["投注总额"] is None
+        assert result[0]["环比"]["投注总额"] is None
 
     def test_progress_flag(self):
         result = _monthly_stats(
@@ -231,8 +233,8 @@ class TestMonthlyStats:
             {}, {}, {},
             today_ym="2026-07",
         )
-        assert result[0]["进行中"] is False
-        assert result[1]["进行中"] is True
+        assert result[0]["进行中"] is True
+        assert result[1]["进行中"] is False
 
     def test_empty_input(self):
         result = _monthly_stats([], {}, {}, {}, {})
@@ -260,7 +262,9 @@ class TestWeeklyStats:
             today=dt_date.fromisoformat("2026-07-10"),  # both weeks in past
         )
         assert len(result) == 2
-        w26 = result[0]
+        w27 = result[0]  # newer first
+        w26 = result[1]
+        assert w27["週次"] == "2026-W27"
         assert w26["週次"] == "2026-W26"
         assert w26["日期段"] == "06-22 → 06-28"
         assert w26["投注总额"] == 300.0
@@ -291,7 +295,7 @@ class TestWeeklyStats:
             {}, {"2026-06-22": 10, "2026-07-01": 15}, {},
         )
         assert len(result) == 2
-        wow = result[1]["前週环比%"]
+        wow = result[0]["前週环比%"]  # W27 newest, has环比 vs W26
         assert wow["投注总额"] == 50.0        # (300/200-1)*100
         assert wow["新增注册"] == 50.0        # (15/10-1)*100
         assert wow["活跃会员"] == 0.0         # 1->1
@@ -309,7 +313,7 @@ class TestWeeklyStats:
              w27_wed: _rv(100, 80, 50, 0, 0, {"u1"})},
             {}, {}, {},
         )
-        assert result[1]["前週环比%"]["投注总额"] is None
+        assert result[0]["前週环比%"]["投注总额"] is None
 
     def test_progress_flag(self):
         result = _weekly_stats(
@@ -319,8 +323,8 @@ class TestWeeklyStats:
             {}, {}, {},
             today=dt_date.fromisoformat("2026-07-01"),
         )
-        assert result[0]["进行中"] is False  # W26 past
-        assert result[1]["进行中"] is True   # W27 has data through Wed, Sun > today
+        assert result[0]["进行中"] is True   # W27 newest, in progress
+        assert result[1]["进行中"] is False
 
     def test_date_range(self):
         result = _weekly_stats(
