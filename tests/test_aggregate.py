@@ -2,7 +2,7 @@ import pytest
 import sys
 sys.path.insert(0, "Dashboard")
 
-from aggregate import _activity_display, _bonus_for, _monthly_stats
+from aggregate import _activity_display, _bonus_for, _monthly_stats, _weekly_stats
 
 
 class TestActivityDisplay:
@@ -236,4 +236,102 @@ class TestMonthlyStats:
 
     def test_empty_input(self):
         result = _monthly_stats([], {}, {}, {}, {})
+        assert result == []
+
+
+from datetime import date as dt_date
+
+w26_mon, w26_sun = "2026-06-22", "2026-06-28"  # Mon-Sun, W26
+w27_mon, w27_wed = "2026-06-29", "2026-07-01"  # Mon-Wed, W27
+
+
+class TestWeeklyStats:
+    def test_basic_aggregation(self):
+        result = _weekly_stats(
+            [w26_mon, w26_sun, w27_mon, w27_wed],
+            {w26_mon: _rv(100, 80, 90, 2, 3, {"u1", "u2"}, 0, 5),
+             w26_sun: _rv(200, 160, 180, 4, 6, {"u2", "u3"}, 0, 10),
+             w27_mon: _rv(50, 40, 30, 1, 0, {"u4"}, 0, 3),
+             w27_wed: _rv(60, 50, 40, 0, 2, {"u5"}, 0, 4)},
+            {w26_mon: _cv(80, 1, {"u1"}), w26_sun: _cv(40, 1, {"u2"}, 20),
+             w27_mon: _cv(30, 1, {"u4"}), w27_wed: _cv(20, 1, {"u5"}, 10)},
+            {w26_mon: 5, w26_sun: 3, w27_mon: 2, w27_wed: 1},
+            {w26_mon: 2, w26_sun: 1, w27_mon: 1, w27_wed: 0},
+            today=dt_date.fromisoformat("2026-07-10"),  # both weeks in past
+        )
+        assert len(result) == 2
+        w26 = result[0]
+        assert w26["週次"] == "2026-W26"
+        assert w26["日期段"] == "06-22 → 06-28"
+        assert w26["投注总额"] == 300.0
+        assert w26["有效打码"] == 240.0
+        assert w26["充值总额"] == 120.0
+        assert w26["提现总额"] == 20.0
+        assert w26["活跃会员"] == 3  # {u1,u2,u3}
+        assert w26["新增注册"] == 8
+        assert w26["首充会员"] == 3
+        ngr26 = 300 - (90+180) - (2+4) - (3+6)
+        assert w26["净利润NGR"] == pytest.approx(ngr26, 0.01)
+        assert w26["进行中"] is False
+
+    def test_active_member_dedup(self):
+        result = _weekly_stats(
+            [w26_mon, w26_sun],
+            {w26_mon: _rv(1, 1, 0, 0, 0, {"u1", "u2"}, 0, 0),
+             w26_sun: _rv(1, 1, 0, 0, 0, {"u2", "u3"}, 0, 0)},
+            {}, {}, {},
+        )
+        assert result[0]["活跃会员"] == 3
+
+    def test_wow_calculation(self):
+        result = _weekly_stats(
+            [w26_mon, w27_wed],
+            {w26_mon: _rv(200, 160, 100, 0, 0, {"u1"}, 0, 10),
+             w27_wed: _rv(300, 240, 150, 0, 0, {"u2"}, 0, 15)},
+            {}, {"2026-06-22": 10, "2026-07-01": 15}, {},
+        )
+        assert len(result) == 2
+        wow = result[1]["前週环比%"]
+        assert wow["投注总额"] == 50.0        # (300/200-1)*100
+        assert wow["新增注册"] == 50.0        # (15/10-1)*100
+        assert wow["活跃会员"] == 0.0         # 1->1
+
+    def test_first_week_no_wow(self):
+        result = _weekly_stats(
+            [w26_mon], {w26_mon: _rv(100, 80, 50, 0, 0, {"u1"}, 0, 0)}, {}, {}, {},
+        )
+        assert result[0]["前週环比%"] == {}
+
+    def test_zerodiv_wow(self):
+        result = _weekly_stats(
+            [w26_mon, w27_wed],
+            {w26_mon: _rv(0, 0, 0, 0, 0, set()),
+             w27_wed: _rv(100, 80, 50, 0, 0, {"u1"})},
+            {}, {}, {},
+        )
+        assert result[1]["前週环比%"]["投注总额"] is None
+
+    def test_progress_flag(self):
+        result = _weekly_stats(
+            [w26_mon, w27_wed],
+            {w26_mon: _rv(1, 1, 0, 0, 0, {"u1"}),
+             w27_wed: _rv(1, 1, 0, 0, 0, {"u2"})},
+            {}, {}, {},
+            today=dt_date.fromisoformat("2026-07-01"),
+        )
+        assert result[0]["进行中"] is False  # W26 past
+        assert result[1]["进行中"] is True   # W27 has data through Wed, Sun > today
+
+    def test_date_range(self):
+        result = _weekly_stats(
+            [w26_mon, w26_sun],
+            {w26_mon: _rv(1, 1, 0, 0, 0, set()),
+             w26_sun: _rv(1, 1, 0, 0, 0, set())},
+            {}, {}, {},
+        )
+        assert result[0]["日期段"] == "06-22 → 06-28"
+        assert result[0]["週次"] == "2026-W26"
+
+    def test_empty_input(self):
+        result = _weekly_stats([], {}, {}, {}, {})
         assert result == []

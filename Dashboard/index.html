@@ -132,6 +132,17 @@
   .mt-wrap th:first-child,.mt-wrap td:first-child{position:sticky;left:0;z-index:1;background:var(--card);text-align:left;font-weight:600;min-width:100px;}
   .mt-wrap th:first-child{background:var(--bg);z-index:2;}
   .mt-wrap tr:last-child td{border-bottom:none;}
+  .wt-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;}
+  .wt-wrap table{border-collapse:collapse;min-width:780px;width:max-content;}
+  .wt-wrap th,.wt-wrap td{padding:10px 12px;font-size:13px;white-space:nowrap;border-bottom:1px solid var(--line);text-align:right;font-variant-numeric:tabular-nums;}
+  .wt-wrap th{background:var(--bg);color:#46506a;font-weight:700;font-size:11.5px;position:sticky;top:0;z-index:1;text-align:center;}
+  .wt-wrap th:first-child,.wt-wrap td:first-child{position:sticky;left:0;z-index:1;background:var(--card);text-align:left;font-weight:600;min-width:88px;}
+  .wt-wrap th:nth-child(2),.wt-wrap td:nth-child(2){position:sticky;left:88px;z-index:0;background:var(--card);text-align:left;color:var(--muted);font-weight:500;font-size:12px;min-width:80px;}
+  .wt-wrap th:first-child{background:var(--bg);z-index:2;}
+  .wt-wrap th:nth-child(2){background:var(--bg);z-index:2;}
+  .wt-wrap tr:last-child td{border-bottom:none;}
+  .wk-tag{display:inline-block;font-size:10px;font-weight:700;padding:2px 6px;border-radius:6px;margin-left:4px;vertical-align:middle;}
+  .wk-tag.live{background:#fdf0d5;color:#b06d0c;}
   .mo-tag{display:inline-block;font-size:10px;font-weight:700;padding:2px 6px;border-radius:6px;margin-left:4px;vertical-align:middle;}
   .mo-tag.live{background:#fdf0d5;color:#b06d0c;}
   .mo-tag.done{background:#e1f5ee;color:#0f6e56;}
@@ -149,6 +160,7 @@
     <div class="sub" id="sub">加载中…</div>
     <div class="nav">
       <a href="#" class="on" id="nav-daily" onclick="switchTab('daily')">运营看板</a>
+      <a href="#" id="nav-weekly" onclick="switchTab('weekly')">週統計</a>
       <a href="#" id="nav-monthly" onclick="switchTab('monthly')">月统计</a>
     </div>
     <div class="datenav" id="datenav" style="display:none">
@@ -194,6 +206,12 @@
     <div class="sec">
       <h2><span class="bar"></span>月度核心指标一览</h2>
       <div class="mt-wrap" id="mt_wrap"></div>
+    </div>
+  </div>
+  <div id="weekly_board" style="display:none">
+    <div class="sec">
+      <h2><span class="bar"></span>週度核心指标一览</h2>
+      <div class="wt-wrap" id="wt_wrap"></div>
     </div>
   </div>
 </div>
@@ -356,17 +374,20 @@ function renderChart(){
   document.getElementById('chart').innerHTML=`<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet"><defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2f5496" stop-opacity=".18"/><stop offset="1" stop-color="#2f5496" stop-opacity="0"/></linearGradient></defs><polygon points="${area}" fill="url(#g)"/>${zline}<polyline points="${pts}" fill="none" stroke="#2f5496" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/>${dots}${labs}</svg>`;
   document.getElementById('chartT').innerHTML=`${metricKey} 走势 <span>${fmt(get(DAYS[cur],path),t)}</span>`;
 }
-function showState(html){document.getElementById('state').style.display='block';document.getElementById('state').innerHTML=html;document.getElementById('board').style.display='none';document.getElementById('monthly_board').style.display='none';document.getElementById('datenav').style.display='none';}
+function showState(html){document.getElementById('state').style.display='block';document.getElementById('state').innerHTML=html;document.getElementById('board').style.display='none';document.getElementById('monthly_board').style.display='none';document.getElementById('weekly_board').style.display='none';document.getElementById('datenav').style.display='none';}
 let currentTab='daily';
 const MONTHLY_COLS=[['投注总额','m'],['净利润NGR','m'],['有效打码','m'],['充值总额','m'],['提现总额','m'],['活跃会员','i'],['新增注册','i'],['首充会员','i']];
 function switchTab(tab){
   currentTab=tab;
   document.getElementById('nav-daily').className=tab==='daily'?'on':'';
+  document.getElementById('nav-weekly').className=tab==='weekly'?'on':'';
   document.getElementById('nav-monthly').className=tab==='monthly'?'on':'';
   document.getElementById('board').style.display=tab==='daily'?'block':'none';
+  document.getElementById('weekly_board').style.display=tab==='weekly'?'block':'none';
   document.getElementById('monthly_board').style.display=tab==='monthly'?'block':'none';
   document.getElementById('datenav').style.display=tab==='daily'?'flex':'none';
   if(tab==='monthly')renderMonthly();
+  if(tab==='weekly')renderWeekly();
 }
 function renderMonthly(){
   const months=META.monthly||[];
@@ -389,6 +410,28 @@ function renderMonthly(){
   });
   html+='</tbody></table>';
   document.getElementById('mt_wrap').innerHTML=html;
+}
+function renderWeekly(){
+  const weeks=META.weekly||[];
+  if(!weeks.length){document.getElementById('wt_wrap').innerHTML='<div class="bnone">暂无週度数据</div>';return;}
+  let html='<table><thead><tr><th>週次</th><th>日期段</th>';
+  MONTHLY_COLS.forEach(([n])=>html+=`<th>${n}</th>`);
+  html+='</tr></thead><tbody>';
+  weeks.forEach(wk=>{
+    const live=wk['进行中'];
+    html+=`<tr><td>${wk['週次']}<span class="wk-tag ${live?'live':''}">${live?'进行中':'✓'}</span></td><td>${wk['日期段']}</td>`;
+    MONTHLY_COLS.forEach(([k,t])=>{
+      const v=wk[k];const neg=(t==='m'&&v<0);
+      html+=`<td><span class="val-main${neg?' val-neg':''}">${fmt(v,t)}</span>`;
+      const wr=(wk['前週环比%']||{})[k];
+      if(wr!=null){const cls=wr>=0?'dlt-up':'dlt-down';const a=wr>=0?'▲':'▼';html+=`<span class="${cls}">${a} ${Math.abs(wr).toFixed(1)}%</span>`;}
+      else{html+='<span class="dlt-na2">—</span>';}
+      html+='</td>';
+    });
+    html+='</tr>';
+  });
+  html+='</tbody></table>';
+  document.getElementById('wt_wrap').innerHTML=html;
 }
 function render(){
   document.getElementById('state').style.display='none';

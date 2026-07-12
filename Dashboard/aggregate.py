@@ -269,6 +269,7 @@ def aggregate(source):
     # 全部出现过的运营日
     days = sorted(set(rev) | set(cp))
     monthly = _monthly_stats(days, rev, cp, reg_by_day, fc_by_day)
+    weekly = _weekly_stats(days, rev, cp, reg_by_day, fc_by_day)
     # 累计注册需覆盖到每个运营日（按注册日 <= 当日累计）
     reg_days_sorted = sorted(reg_by_day)
 
@@ -350,6 +351,7 @@ def aggregate(source):
             "注册": _retention(regdate, active_days, covered, max_n=14),
         },
         "monthly": monthly,
+        "weekly": weekly,
         "首充会员数": len(firstcharge),
         "注册会员数": len(regdate),
     }
@@ -419,6 +421,84 @@ def _monthly_stats(days, rev, cp, reg_by_day, fc_by_day, today_ym=None):
                 pv = prev[k]
                 cv = entry[k]
                 entry["环比"][k] = round((cv / pv - 1) * 100, 2) if pv else None
+
+        result.append(entry)
+
+    return result
+
+
+def _weekly_stats(days, rev, cp, reg_by_day, fc_by_day, today=None):
+    """週度彙總（ISO 週一至週日），附前週環比。"""
+    from collections import defaultdict
+    from datetime import date as dt_date, timedelta
+
+    if today is None:
+        today = dt_date.today()
+
+    weeks = defaultdict(lambda: {
+        "投注额": 0.0, "派彩额": 0.0, "有效打码": 0.0,
+        "彩金": 0.0, "返水": 0.0, "活跃_set": set(),
+        "充值额": 0.0, "提现额": 0.0,
+        "新增注册": 0, "首充会员": 0,
+    })
+
+    for d in days:
+        dt = dt_date.fromisoformat(d)
+        iso = dt.isocalendar()
+        wk = f"{iso[0]}-W{iso[1]:02d}"
+        m = weeks[wk]
+        rv = rev.get(d, [0.0, 0.0, 0.0, 0.0, 0.0, set(), 0.0, 0])
+        cv = cp.get(d, [0.0, 0, set(), 0.0, 0, set()])
+        bet, eff, pay, fs, hd, act, _est, _bn = rv
+        dep, _dpn, _dpp, wd, _wpn, _wpp = cv
+
+        m["投注额"] += bet
+        m["派彩额"] += pay
+        m["有效打码"] += eff
+        m["彩金"] += hd
+        m["返水"] += fs
+        m["充值额"] += dep
+        m["提现额"] += wd
+        m["活跃_set"].update(act)
+        m["新增注册"] += reg_by_day.get(d, 0)
+        m["首充会员"] += fc_by_day.get(d, 0)
+
+    sorted_weeks = sorted(weeks.keys())
+    result = []
+
+    for i, wk in enumerate(sorted_weeks):
+        m = weeks[wk]
+        ngr = m["投注额"] - m["派彩额"] - m["彩金"] - m["返水"]
+        active = len(m["活跃_set"])
+        week_days = [d for d in days if d[:4] == wk[:4] and
+                     dt_date.fromisoformat(d).isocalendar()[1] == int(wk[6:])]
+        date_range = f"{week_days[0][5:]}" if week_days else ""
+        if len(week_days) >= 2:
+            date_range += f" → {week_days[-1][5:]}"
+
+        entry = {
+            "週次": wk,
+            "日期段": date_range,
+            "投注总额": round(m["投注额"], 2),
+            "净利润NGR": round(ngr, 2),
+            "有效打码": round(m["有效打码"], 2),
+            "充值总额": round(m["充值额"], 2),
+            "提现总额": round(m["提现额"], 2),
+            "活跃会员": active,
+            "新增注册": m["新增注册"],
+            "首充会员": m["首充会员"],
+            "前週环比%": {},
+        }
+        # 進行中：該週最後一天（週日）> today
+        entry["进行中"] = week_days and dt_date.fromisoformat(week_days[-1]) >= today
+
+        if i > 0:
+            prev = result[i - 1]
+            for k in ["投注总额", "净利润NGR", "有效打码", "充值总额", "提现总额",
+                      "活跃会员", "新增注册", "首充会员"]:
+                pv = prev[k]
+                cv = entry[k]
+                entry["前週环比%"][k] = round((cv / pv - 1) * 100, 2) if pv else None
 
         result.append(entry)
 
