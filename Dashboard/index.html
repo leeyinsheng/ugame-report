@@ -125,6 +125,21 @@
   .vtablewrap td.vn i{width:8px;height:8px;border-radius:50%;}
   .vtablewrap td.vv{text-align:right;font-weight:700;font-variant-numeric:tabular-nums;}
   .vtablewrap td.vd{text-align:right;font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums;}
+  .mt-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;}
+  .mt-wrap table{border-collapse:collapse;min-width:720px;width:max-content;}
+  .mt-wrap th,.mt-wrap td{padding:10px 12px;font-size:13px;white-space:nowrap;border-bottom:1px solid var(--line);text-align:right;font-variant-numeric:tabular-nums;}
+  .mt-wrap th{background:var(--bg);color:#46506a;font-weight:700;font-size:11.5px;position:sticky;top:0;z-index:1;text-align:center;}
+  .mt-wrap th:first-child,.mt-wrap td:first-child{position:sticky;left:0;z-index:1;background:var(--card);text-align:left;font-weight:600;min-width:100px;}
+  .mt-wrap th:first-child{background:var(--bg);z-index:2;}
+  .mt-wrap tr:last-child td{border-bottom:none;}
+  .mo-tag{display:inline-block;font-size:10px;font-weight:700;padding:2px 6px;border-radius:6px;margin-left:4px;vertical-align:middle;}
+  .mo-tag.live{background:#fdf0d5;color:#b06d0c;}
+  .mo-tag.done{background:#e1f5ee;color:#0f6e56;}
+  .dlt-up{color:var(--green);font-size:11px;display:block;}
+  .dlt-down{color:var(--red);font-size:11px;display:block;}
+  .dlt-na2{color:var(--muted);font-size:11px;display:block;}
+  .val-main{font-weight:700;color:var(--txt);}
+  .val-neg{color:var(--red);}
 </style>
 </head>
 <body>
@@ -133,8 +148,8 @@
     <h1>U.Game 运营数据看板 <button class="rfs" id="refreshBtn" onclick="reload()">刷新</button></h1>
     <div class="sub" id="sub">加载中…</div>
     <div class="nav">
-      <a href="#" class="on" onclick="return false">运营看板</a>
-
+      <a href="#" class="on" id="nav-daily" onclick="switchTab('daily')">运营看板</a>
+      <a href="#" id="nav-monthly" onclick="switchTab('monthly')">月统计</a>
     </div>
     <div class="datenav" id="datenav" style="display:none">
       <button class="navbtn" id="prev" onclick="step(-1)">‹</button>
@@ -173,6 +188,13 @@
     <div class="sec"><h2><span class="bar"></span>游戏指标 · 场馆投注 TOP 10</h2><div id="t_game" class="gamewrap"></div></div>
     <div class="sec"><h2><span class="bar"></span>活动彩金 · 领取情况</h2><div id="t_bonus"></div></div>
     <div class="note">数据来源：raw-data 后台导出原始数据（注单 / 充提 / 账变 / 会员汇总）<br>注单按派彩结算日、充提按完成时间统计 · GGR=投注−派彩 · NGR=GGR−彩金−实际返水（不含代理佣金）· 平台整体杀率=GGR/有效打码（即平台输赢/有效打码）· 净利率=NGR/有效打码 · 币种 USDT<br><span style="color:#b6bdcc">预计返水来自注单明细、实际返水来自账变记录（NGR 用实际返水）；累计 / 新增注册依据最新会员汇总快照回溯计算</span></div>
+  </div>
+
+  <div id="monthly_board" style="display:none">
+    <div class="sec">
+      <h2><span class="bar"></span>月度核心指标一览</h2>
+      <div class="mt-wrap" id="mt_wrap"></div>
+    </div>
   </div>
 </div>
 
@@ -334,7 +356,40 @@ function renderChart(){
   document.getElementById('chart').innerHTML=`<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet"><defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2f5496" stop-opacity=".18"/><stop offset="1" stop-color="#2f5496" stop-opacity="0"/></linearGradient></defs><polygon points="${area}" fill="url(#g)"/>${zline}<polyline points="${pts}" fill="none" stroke="#2f5496" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/>${dots}${labs}</svg>`;
   document.getElementById('chartT').innerHTML=`${metricKey} 走势 <span>${fmt(get(DAYS[cur],path),t)}</span>`;
 }
-function showState(html){document.getElementById('state').style.display='block';document.getElementById('state').innerHTML=html;document.getElementById('board').style.display='none';document.getElementById('datenav').style.display='none';}
+function showState(html){document.getElementById('state').style.display='block';document.getElementById('state').innerHTML=html;document.getElementById('board').style.display='none';document.getElementById('monthly_board').style.display='none';document.getElementById('datenav').style.display='none';}
+let currentTab='daily';
+const MONTHLY_COLS=[['投注总额','m'],['净利润NGR','m'],['有效打码','m'],['充值总额','m'],['提现总额','m'],['活跃会员','i'],['新增注册','i'],['首充会员','i']];
+function switchTab(tab){
+  currentTab=tab;
+  document.getElementById('nav-daily').className=tab==='daily'?'on':'';
+  document.getElementById('nav-monthly').className=tab==='monthly'?'on':'';
+  document.getElementById('board').style.display=tab==='daily'?'block':'none';
+  document.getElementById('monthly_board').style.display=tab==='monthly'?'block':'none';
+  document.getElementById('datenav').style.display=tab==='daily'?'flex':'none';
+  if(tab==='monthly')renderMonthly();
+}
+function renderMonthly(){
+  const months=META.monthly||[];
+  if(!months.length){document.getElementById('mt_wrap').innerHTML='<div class="bnone">暂无月度数据</div>';return;}
+  let html='<table><thead><tr><th>月份</th>';
+  MONTHLY_COLS.forEach(([n])=>html+=`<th>${n}</th>`);
+  html+='</tr></thead><tbody>';
+  months.forEach(mo=>{
+    const live=mo['进行中'];
+    html+=`<tr><td>${mo['月份']}<span class="mo-tag ${live?'live':'done'}">${live?'进行中':'已结'}</span></td>`;
+    MONTHLY_COLS.forEach(([k,t])=>{
+      const v=mo[k];const neg=(t==='m'&&v<0);
+      html+=`<td><span class="val-main${neg?' val-neg':''}">${fmt(v,t)}</span>`;
+      const wr=(mo['环比']||{})[k];
+      if(wr!=null){const cls=wr>=0?'dlt-up':'dlt-down';const a=wr>=0?'▲':'▼';html+=`<span class="${cls}">${a} ${Math.abs(wr).toFixed(1)}% vs 上月</span>`;}
+      else{html+='<span class="dlt-na2">— 首月</span>';}
+      html+='</td>';
+    });
+    html+='</tr>';
+  });
+  html+='</tbody></table>';
+  document.getElementById('mt_wrap').innerHTML=html;
+}
 function render(){
   document.getElementById('state').style.display='none';
   document.getElementById('board').style.display='block';

@@ -2,7 +2,7 @@ import pytest
 import sys
 sys.path.insert(0, "Dashboard")
 
-from aggregate import _activity_display, _bonus_for
+from aggregate import _activity_display, _bonus_for, _monthly_stats
 
 
 class TestActivityDisplay:
@@ -148,3 +148,92 @@ class TestBonusFor:
         result = _bonus_for(snaps, "2026-07-03")
         assert result["summary"]["累计到帐彩金"] == pytest.approx(1672.79)
         assert result["summary"]["整体兑现率"] == pytest.approx(1672.79 / 1972.79 * 100, 0.01)
+
+
+day1, day2, day3 = "2026-06-01", "2026-06-02", "2026-07-01"
+
+
+def _rv(bet=0.0, eff=0.0, pay=0.0, fs=0.0, hd=0.0, act=None, est=0.0, bn=0):
+    return [bet, eff, pay, fs, hd, act or set(), est, bn]
+
+
+def _cv(dep=0.0, dpn=0, dpp=None, wd=0.0, wpn=0, wpp=None):
+    return [dep, dpn, dpp or set(), wd, wpn, wpp or set()]
+
+
+class TestMonthlyStats:
+    def test_basic_aggregation(self):
+        result = _monthly_stats(
+            [day1, day2, day3],
+            {day1: _rv(100, 80, 90, 2, 3, {"u1", "u2"}),
+             day2: _rv(200, 160, 180, 4, 6, {"u2", "u3"}),
+             day3: _rv(300, 240, 270, 6, 9, {"u4"})},
+            {day1: _cv(50, 1, {"u1"}),
+             day2: _cv(60, 1, {"u2"}, 10),
+             day3: _cv(70, 1, {"u4"}, 20)},
+            {day1: 5, day2: 3, day3: 7},
+            {day1: 2, day2: 1, day3: 3},
+        )
+        assert len(result) == 2
+        jun = result[0]
+        assert jun["月份"] == "2026-06"
+        assert jun["投注总额"] == 300.0
+        assert jun["有效打码"] == 240.0
+        assert jun["充值总额"] == 110.0
+        assert jun["提现总额"] == 10.0
+        assert jun["活跃会员"] == 3   # {u1,u2,u3} deduped
+        assert jun["新增注册"] == 8
+        assert jun["首充会员"] == 3
+        assert jun["净利润NGR"] == pytest.approx(300 - (90+180) - (2+4) - (3+6), 0.01)
+
+    def test_active_member_dedup(self):
+        result = _monthly_stats(
+            [day1, day2],
+            {day1: _rv(1, 1, 0, 0, 0, {"u1", "u2"}),
+             day2: _rv(1, 1, 0, 0, 0, {"u2", "u3"})},
+            {}, {}, {},
+        )
+        assert result[0]["活跃会员"] == 3  # union, not sum
+
+    def test_first_month_no_huanbi(self):
+        result = _monthly_stats(
+            [day1], {day1: _rv(100, 80, 50, 0, 0, {"u1"})}, {}, {}, {},
+        )
+        assert result[0]["环比"] == {}
+
+    def test_huanbi_calculation(self):
+        result = _monthly_stats(
+            [day1, day3],
+            {day1: _rv(100, 80, 50, 0, 0, {"u1"}, 0, 5),
+             day3: _rv(200, 160, 100, 0, 0, {"u2"}, 0, 10)},
+            {}, {"2026-06-01": 10, "2026-07-01": 20}, {},
+        )
+        assert len(result) == 2
+        hb = result[1]["环比"]
+        assert hb["投注总额"] == 100.0       # (200/100-1)*100
+        assert hb["新增注册"] == 100.0       # (20/10-1)*100
+        assert hb["活跃会员"] == 0.0         # 1->1 no change
+
+    def test_zerodiv_huanbi(self):
+        result = _monthly_stats(
+            [day1, day3],
+            {day1: _rv(0, 0, 0, 0, 0, set()),
+             day3: _rv(100, 80, 50, 0, 0, {"u1"})},
+            {}, {}, {},
+        )
+        assert result[1]["环比"]["投注总额"] is None
+
+    def test_progress_flag(self):
+        result = _monthly_stats(
+            [day1, day3],
+            {day1: _rv(1, 1, 0, 0, 0, {"u1"}),
+             day3: _rv(1, 1, 0, 0, 0, {"u2"})},
+            {}, {}, {},
+            today_ym="2026-07",
+        )
+        assert result[0]["进行中"] is False
+        assert result[1]["进行中"] is True
+
+    def test_empty_input(self):
+        result = _monthly_stats([], {}, {}, {}, {})
+        assert result == []
