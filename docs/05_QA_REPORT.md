@@ -1,14 +1,25 @@
-# Phase 5 測試計畫 & QA Report (v1.6)
+# Phase 5 測試計畫 & QA Report (v1.7)
 
-## 測試案例
+## 新增測試
 
-| # | 測試 | 預期 | 結果 |
-|---|------|------|------|
-| 1 | index.html 無「数据核对」連結 | grep 無匹配 | PASS |
-| 2 | server.py 無 `/api/reconcile` 路由 | grep 無匹配 | PASS |
-| 3 | `reconcile` 非 server.py 頂層 import | 無殘留 import | PASS |
-| 4 | 既有 14 項 aggregate 單元測試 | 全部通過 | PASS |
+| # | 測試 | 覆蓋點 | 結果 |
+|---|------|--------|------|
+| 1 | test_basic_aggregation | 跨月彙總 8 指標 + NGR 計算 | PASS |
+| 2 | test_active_member_dedup | 同月跨日活躍會員 union 去重 | PASS |
+| 3 | test_first_month_no_huanbi | 首月環比為空 | PASS |
+| 4 | test_huanbi_calculation | 環比公式（投注、註冊、活躍） | PASS |
+| 5 | test_zerodiv_huanbi | 上月為 0 時環比 None | PASS |
+| 6 | test_progress_flag | 進行中 flag（today_ym 注入） | PASS |
+| 7 | test_empty_input | 空數據回傳 [] | PASS |
 
-## 結果
+## 既有回歸測試
 
-**14/14 PASS** ✅ — 無回歸問題。
+| 類別 | 數量 | 結果 |
+|------|------|------|
+| TestActivityDisplay | 7 | PASS |
+| TestBonusFor | 7 | PASS |
+| **總計** | **21** | **PASS** |
+
+## 結論
+
+**PASS** — 0 回歸問題。
