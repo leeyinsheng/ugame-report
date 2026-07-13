@@ -78,28 +78,47 @@ def _save_state(state):
         pickle.dump(state, f, pickle.HIGHEST_PROTOCOL)
 
 
+def _build_file_map(source):
+    """從 source.signature() 建立 {filename: (size, mtime, oss_key)} 映射。"""
+    fm = {}
+    for item in source.signature():
+        key = item[0]
+        size = item[1]
+        mtime = item[2] if len(item) > 2 else 0
+        name = key.split("/")[-1]
+        fm[name] = (size, mtime, key)
+    return fm
+
+
 def get_summary():
     _init_cache()
 
-    # 合并 OSS 签名
-    sig = SOURCE.signature()
-    if ACTIVITY_SOURCE:
-        act_sig = ACTIVITY_SOURCE.signature()
-        sig = (sig, act_sig)
-
+    curr_files = _build_file_map(SOURCE)
     state = _load_state()
 
-    if state and state.get("sig") == sig:
+    # 快取命中 → 直接回傳
+    cached_files = state.get("files") if state else None
+    if cached_files and cached_files == curr_files:
         return state["data"]
 
-    # 需要重建：优先增量
+    # 找出新增/變更的檔案 → 只下載這些
+    new_keys = None
+    if cached_files and state.get("intermediate"):
+        new_keys = set()
+        for name, (size, mtime, oss_key) in curr_files.items():
+            prev = cached_files.get(name)
+            if prev is None or prev[:2] != (size, mtime):
+                new_keys.add(oss_key)
+        if not new_keys:
+            new_keys = None  # 無新檔 → 全量（活動源可能變更）
+
     if state and state.get("intermediate"):
         inter = state["intermediate"]
-        data, inter = aggregate.aggregate(SOURCE, ACTIVITY_SOURCE, base=inter)
+        data, inter = aggregate.aggregate(SOURCE, ACTIVITY_SOURCE, base=inter, only_keys=new_keys)
     else:
         data, inter = aggregate.aggregate(SOURCE, ACTIVITY_SOURCE)
 
-    _save_state({"sig": sig, "data": data, "intermediate": inter})
+    _save_state({"files": curr_files, "data": data, "intermediate": inter})
     return data
 
 

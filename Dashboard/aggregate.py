@@ -123,7 +123,7 @@ def classify(cols):
     return None
 
 
-def aggregate(source, activity_source=None, base=None):
+def aggregate(source, activity_source=None, base=None, only_keys=None):
     """聚合数据源中的 CSV，返回 (output, intermediate) 元组。
 
     source 可以是：
@@ -131,7 +131,8 @@ def aggregate(source, activity_source=None, base=None):
       · 任意带 .iter_csv() 的数据源对象（LocalSource / OssSource）
     activity_source: 可选，独立的活动数据源（如 OSS 不同前缀）
     base: 可选，已有的中间状态（用于增量更新），格式 {bets,ledger,cash,member_map,activity_snaps}
-    """
+    only_keys: 可选，仅处理指定文件名集合（OSS object key 或本地文件名）"""
+
     if isinstance(source, str):
         from sources import LocalSource
         source = LocalSource(source)
@@ -150,7 +151,7 @@ def aggregate(source, activity_source=None, base=None):
         member_map = {}  # 会员ID -> row（合併所有日期的會員檔）
         activity_snaps = {}  # 快照日 -> {(活动名称, 活动ID): ...}（累计值）
 
-    for name, order_key, f in source.iter_csv():
+    for name, order_key, f in source.iter_csv(only_keys):
         with f:
             r = csv.DictReader(f)
             kind = classify(r.fieldnames or [])

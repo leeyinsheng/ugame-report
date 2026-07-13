@@ -30,14 +30,18 @@ class LocalSource:
                         pass
         return tuple(sig)
 
-    def iter_csv(self):
+    def iter_csv(self, only_keys=None):
         for p in sorted(glob.glob(os.path.join(self.root, "*.csv"))):
             try:
                 mtime = os.path.getmtime(p)
                 fh = open(p, encoding="utf-8-sig", newline="")
             except OSError:
                 continue
-            yield os.path.basename(p), mtime, fh
+            name = os.path.basename(p)
+            if only_keys is not None and name not in only_keys:
+                fh.close()
+                continue
+            yield name, mtime, fh
 
 
 class OssSource:
@@ -81,9 +85,11 @@ class OssSource:
         sig.sort()
         return tuple(sig)
 
-    def iter_csv(self):
+    def iter_csv(self, only_keys=None):
         objs = sorted(self._objects(), key=lambda o: o.key)
         for obj in objs:
+            if only_keys is not None and obj.key not in only_keys:
+                continue
             data = self.bucket.get_object(obj.key).read()
             name = obj.key.split("/")[-1]
             yield name, int(obj.last_modified or 0), io.StringIO(data.decode("utf-8-sig"))
