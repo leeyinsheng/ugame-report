@@ -139,8 +139,7 @@ def aggregate(source, activity_source=None):
     bets = {}        # 本平台单号 -> (派彩日, 会员ID, 投注, 有效, 派彩)
     ledger = {}      # 流水号    -> (日, 类型, 金额)
     cash = {}        # 订单号    -> (日, 充值, 提现, 会员ID)
-    member_rows = None      # 取最新的会员快照（缓存其行）
-    member_key = None       # 对应排序键（mtime / last_modified）
+    member_map = {}         # 会员ID -> row（合併所有日期的會員檔）
     activity_snaps = {}     # 快照日 -> {(活动名称, 活动ID): {触发,到帐,次数,触发人数,领取人数,领取率}}（累计值）
 
     for name, order_key, f in source.iter_csv():
@@ -169,8 +168,10 @@ def aggregate(source, activity_source=None):
                         }
                 continue
             if kind == "member":
-                if member_key is None or order_key > member_key:
-                    member_key, member_rows = order_key, list(r)
+                for row in r:
+                    mid = (pick(row, "会员ID", "会员 ID") or "").strip()
+                    if mid:
+                        member_map[mid] = row
                 continue
             for row in r:
                 if kind == "bet":
@@ -281,19 +282,16 @@ def aggregate(source, activity_source=None):
     fc_by_day = {}      # 日 -> 当日首充会员数
     firstcharge = {}    # 会员ID -> 首充日（首充留存同期群）
     regdate = {}        # 会员ID -> 注册日（注册留存同期群）
-    if member_rows:
-        for row in member_rows:
-            mid = (pick(row, "会员ID", "会员 ID") or "").strip()
+    if member_map:
+        for mid, row in member_map.items():
             rd = daypart(row.get("注册日期时间"))
             if rd:
                 reg_by_day[rd] = reg_by_day.get(rd, 0) + 1
-                if mid:
-                    regdate[mid] = rd
+                regdate[mid] = rd
             fd = daypart(row.get("第一次充值成功的日期时间"))
             if fd:
                 fc_by_day[fd] = fc_by_day.get(fd, 0) + 1
-                if mid:
-                    firstcharge[mid] = fd
+                firstcharge[mid] = fd
 
     # 全部出现过的运营日
     days = sorted(set(rev) | set(cp))
