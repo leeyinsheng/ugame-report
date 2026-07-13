@@ -467,7 +467,7 @@ def _monthly_stats(days, rev, cp, reg_by_day, fc_by_day, today_ym=None):
                       "活跃会员", "新增注册", "首充会员"]:
                 pv = prev[k]
                 cv = entry[k]
-                entry["环比"][k] = round((cv / pv - 1) * 100, 2) if pv else None
+                entry["环比"][k] = round((cv - pv) / abs(pv) * 100, 2) if pv else None
 
         result.append(entry)
 
@@ -546,7 +546,7 @@ def _weekly_stats(days, rev, cp, reg_by_day, fc_by_day, today=None):
                       "活跃会员", "新增注册", "首充会员"]:
                 pv = prev[k]
                 cv = entry[k]
-                entry["前週环比%"][k] = round((cv / pv - 1) * 100, 2) if pv else None
+                entry["前週环比%"][k] = round((cv - pv) / abs(pv) * 100, 2) if pv else None
 
         result.append(entry)
 
