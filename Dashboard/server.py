@@ -14,6 +14,7 @@ U.Game 运营数据看板 —— 本地服务器
       只有新增 / 替换文件时才重算）—— 上传后刷新页面即时生效。
 仅依赖 Python 标准库。
 """
+import base64
 import json
 import os
 import sys
@@ -25,6 +26,12 @@ import sources
 
 BASE = os.path.dirname(os.path.abspath(__file__))
 RAW = os.path.join(BASE, "raw-data")
+
+_AUTH_USER = os.environ.get("AUTH_USERNAME", "")
+_AUTH_PASS = os.environ.get("AUTH_PASSWORD", "")
+_AUTH_ENABLED = bool(_AUTH_USER and _AUTH_PASS)
+_AUTH_CRED = f"{_AUTH_USER}:{_AUTH_PASS}".encode("utf-8") if _AUTH_ENABLED else b""
+_AUTH_B64 = base64.b64encode(_AUTH_CRED).decode("ascii") if _AUTH_ENABLED else ""
 
 _src = sources.from_env(RAW)
 SOURCE = _src[0]
@@ -54,6 +61,15 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def do_GET(self):
+        if _AUTH_ENABLED:
+            auth = self.headers.get("Authorization", "")
+            if not auth.startswith("Basic ") or auth[6:] != _AUTH_B64:
+                self.send_response(401)
+                self.send_header("WWW-Authenticate",
+                                 'Basic realm="U.Game Dashboard", charset="UTF-8"')
+                self.end_headers()
+                self.wfile.write(b"401 Unauthorized")
+                return
         path = self.path.split("?", 1)[0]
         if path in ("/api/summary", "/api/summary/"):
             try:
