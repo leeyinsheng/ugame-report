@@ -4,12 +4,12 @@
 |-------|------|--------|
 | 1 | Product Ideation | ✅ |
 | 2 | Product Design | ✅ |
-| 3 | Feature Dev + Unit Tests | ✅ |
-| 4 | Code Review | ✅ |
-| 5 | Regression Testing | ✅ |
-| 6 | Feature Verification | ✅ |
-| 7 | User Acceptance | ✅ |
+| 3 | Feature Dev + Unit Tests | ⏳ |
+| 4 | Code Review | |
+| 5 | Regression Testing | |
+| 6 | Feature Verification | |
+| 7 | User Acceptance | |
 
-## Current Iteration (v1.10)
+## Current Iteration (v1.12)
 
-新增二次充值會員指標 + 修復環比負值方向錯誤
+新人首充100%豪礼手動派發識別：資金修正 = 首充金額 → 歸類為彩金

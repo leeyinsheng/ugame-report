@@ -201,7 +201,8 @@ def aggregate(source, activity_source=None, base=None, only_keys=None):
                         continue
                     ledger[k] = (daypart(pick(row, "账变时间", "帐变时间")),
                                  (pick(row, "账变类型", "帐变类型") or ""),
-                                 num(pick(row, "账变金额", "帐变金额")))
+                                 num(pick(row, "账变金额", "帐变金额")),
+                                 row.get("会员ID") or "")
                 elif kind == "cashflow":
                     # 状态列两种写法；成功口径含「成功 / 已成功 / 已完成」，排除失败
                     status = (pick(row, "订单状态", "状态") or "").strip()
@@ -268,12 +269,25 @@ def aggregate(source, activity_source=None, base=None, only_keys=None):
         gv = game.setdefault(d, {}).setdefault(venue_display(venue), [0.0, 0.0, 0.0, 0])
         gv[0] += bet; gv[1] += payout; gv[2] += eff; gv[3] += 1
 
-    for d, t, amt in ledger.values():
+    # 会员首次充值金额（用於資金修正→彩金識別）
+    first_dep = {}
+    for _d, _dep, _wd, _mid in cash.values():
+        if _dep > 0 and _mid:
+            cur = first_dep.get(_mid)
+            if cur is None or _d < cur[0]:
+                first_dep[_mid] = (_d, _dep)
+
+    for d, t, amt, mid in ledger.values():
         if not d:
             continue
         a = _rev(d)
         if "返水" in t:                                   # 返水 / 遊戲返水 / 游戏返水
             a[3] += amt
+        elif "资金修正" in t and mid:
+            # 新人首充100%豪礼手動派發：資金修正金額=首次充值金額
+            fc = first_dep.get(mid)
+            if fc and abs(amt - fc[1]) < 0.01 and d >= fc[0]:
+                a[4] += amt
         elif any(w in t for w in ("活动", "活動", "彩金", "奖励", "獎勵")):  # 彩金 / 活動獎勵
             a[4] += amt
 
