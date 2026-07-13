@@ -17,6 +17,7 @@ U.Game 运营数据看板 —— 本地服务器
 import base64
 import json
 import os
+import pickle
 import sys
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse, parse_qs
@@ -38,17 +39,68 @@ SOURCE = _src[0]
 SOURCE_KIND = _src[1]
 ACTIVITY_SOURCE = _src[2] if len(_src) > 2 else None
 
-_cache = {"sig": None, "data": None}
+CACHE_DIR = os.path.join(BASE, ".cache")
+CACHE_FILE = os.path.join(CACHE_DIR, "state.pkl")
+PID_FILE = os.path.join(CACHE_DIR, ".pid")
+
+
+def _cache_valid():
+    if not os.path.exists(PID_FILE):
+        return False
+    try:
+        with open(PID_FILE) as f:
+            return int(f.read().strip()) == os.getpid()
+    except (ValueError, OSError):
+        return False
+
+
+def _init_cache():
+    os.makedirs(CACHE_DIR, exist_ok=True)
+    if not _cache_valid():
+        if os.path.exists(CACHE_FILE):
+            os.remove(CACHE_FILE)
+        with open(PID_FILE, "w") as f:
+            f.write(str(os.getpid()))
+
+
+def _load_state():
+    if os.path.exists(CACHE_FILE):
+        try:
+            with open(CACHE_FILE, "rb") as f:
+                return pickle.load(f)
+        except (pickle.UnpicklingError, EOFError, OSError):
+            pass
+    return None
+
+
+def _save_state(state):
+    with open(CACHE_FILE, "wb") as f:
+        pickle.dump(state, f, pickle.HIGHEST_PROTOCOL)
 
 
 def get_summary():
+    _init_cache()
+
+    # 合并 OSS 签名
     sig = SOURCE.signature()
     if ACTIVITY_SOURCE:
-        sig = (sig, ACTIVITY_SOURCE.signature())
-    if sig != _cache["sig"]:
-        _cache["data"] = aggregate.aggregate(SOURCE, ACTIVITY_SOURCE)
-        _cache["sig"] = sig
-    return _cache["data"]
+        act_sig = ACTIVITY_SOURCE.signature()
+        sig = (sig, act_sig)
+
+    state = _load_state()
+
+    if state and state.get("sig") == sig:
+        return state["data"]
+
+    # 需要重建：优先增量
+    if state and state.get("intermediate"):
+        inter = state["intermediate"]
+        data, inter = aggregate.aggregate(SOURCE, ACTIVITY_SOURCE, base=inter)
+    else:
+        data, inter = aggregate.aggregate(SOURCE, ACTIVITY_SOURCE)
+
+    _save_state({"sig": sig, "data": data, "intermediate": inter})
+    return data
 
 
 class Handler(BaseHTTPRequestHandler):

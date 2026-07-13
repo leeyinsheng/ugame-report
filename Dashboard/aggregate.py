@@ -123,24 +123,32 @@ def classify(cols):
     return None
 
 
-def aggregate(source, activity_source=None):
-    """聚合数据源中的 CSV，返回 { 'YYYY-MM-DD': {rev,mem,cp} }（按日期排序）。
+def aggregate(source, activity_source=None, base=None):
+    """聚合数据源中的 CSV，返回 (output, intermediate) 元组。
 
     source 可以是：
       · 字符串（本地目录路径，自动包成 LocalSource）
       · 任意带 .iter_csv() 的数据源对象（LocalSource / OssSource）
     activity_source: 可选，独立的活动数据源（如 OSS 不同前缀）
+    base: 可选，已有的中间状态（用于增量更新），格式 {bets,ledger,cash,member_map,activity_snaps}
     """
     if isinstance(source, str):
         from sources import LocalSource
         source = LocalSource(source)
 
-    # 去重容器
-    bets = {}        # 本平台单号 -> (派彩日, 会员ID, 投注, 有效, 派彩)
-    ledger = {}      # 流水号    -> (日, 类型, 金额)
-    cash = {}        # 订单号    -> (日, 充值, 提现, 会员ID)
-    member_map = {}         # 会员ID -> row（合併所有日期的會員檔）
-    activity_snaps = {}     # 快照日 -> {(活动名称, 活动ID): {触发,到帐,次数,触发人数,领取人数,领取率}}（累计值）
+    # 去重容器（从 base 继承或新建）
+    if base:
+        bets = dict(base.get("bets", {}))
+        ledger = dict(base.get("ledger", {}))
+        cash = dict(base.get("cash", {}))
+        member_map = dict(base.get("member_map", {}))
+        activity_snaps = dict(base.get("activity_snaps", {}))
+    else:
+        bets = {}        # 本平台单号 -> (派彩日, 会员ID, 投注, 有效, 派彩)
+        ledger = {}      # 流水号    -> (日, 类型, 金额)
+        cash = {}        # 订单号    -> (日, 充值, 提现, 会员ID)
+        member_map = {}  # 会员ID -> row（合併所有日期的會員檔）
+        activity_snaps = {}  # 快照日 -> {(活动名称, 活动ID): ...}（累计值）
 
     for name, order_key, f in source.iter_csv():
         with f:
@@ -402,7 +410,11 @@ def aggregate(source, activity_source=None):
         "首充会员数": len(firstcharge),
         "注册会员数": len(regdate),
     }
-    return out
+    intermediate = {
+        "bets": bets, "ledger": ledger, "cash": cash,
+        "member_map": member_map, "activity_snaps": activity_snaps,
+    }
+    return out, intermediate
 
 
 def _monthly_stats(days, rev, cp, reg_by_day, fc_by_day, today_ym=None):
@@ -705,4 +717,5 @@ def _top_games(venues, total_bet, n=10):
 if __name__ == "__main__":
     import json, sys
     d = sys.argv[1] if len(sys.argv) > 1 else os.path.join(os.path.dirname(__file__), "raw-data")
-    print(json.dumps(aggregate(d), ensure_ascii=False, indent=2))
+    data, _ = aggregate(d)
+    print(json.dumps(data, ensure_ascii=False, indent=2))
