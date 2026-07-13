@@ -277,6 +277,18 @@ def aggregate(source, activity_source=None):
         if wd > 0:
             a[3] += wd; a[4] += 1; a[5].add(mid)
 
+    # ---- 二次充值会员：会员ID -> 累積充值次數，取第二次充值日 ----
+    from collections import defaultdict as _dd
+    member_dep_days = _dd(set)
+    for _d, _dep, _wd, _mid in cash.values():
+        if _dep > 0:
+            member_dep_days[_mid].add(_d)
+    sc_by_day = {}
+    for _mid, _days in member_dep_days.items():
+        sd = sorted(_days)
+        if len(sd) >= 2:
+            sc_by_day[sd[1]] = sc_by_day.get(sd[1], 0) + 1
+
     # ---- 会员快照：每日新增注册 / 首充 / 累计注册 ----
     reg_by_day = {}     # 日 -> 当日注册数
     fc_by_day = {}      # 日 -> 当日首充会员数
@@ -305,6 +317,12 @@ def aggregate(source, activity_source=None):
 
     def cum_fc(day):   # 累计充值会员：首充日 <= 当日的会员数
         return sum(n for fd, n in fc_by_day.items() if fd <= day)
+
+    cum_sc_cache = {}
+    _running = 0
+    for _d in days:
+        _running += sc_by_day.get(_d, 0)
+        cum_sc_cache[_d] = _running
 
     out = {}
     cum_dep = 0.0
@@ -344,6 +362,8 @@ def aggregate(source, activity_source=None):
                 "新增注册": new_reg, "活跃会员": active,
                 "首充会员": first_charge,
                 "新客首充率": safe(first_charge * 100, new_reg),
+                "二次充值会员": cum_sc_cache.get(d, 0),
+                "二充率": safe(cum_sc_cache.get(d, 0) * 100, cum_fc(d)),
                 "活跃率": safe(active * 100, cum),
                 "人均投注": safe(bet_t, active),
                 "人均充值": safe(dep_t, dep_people),
