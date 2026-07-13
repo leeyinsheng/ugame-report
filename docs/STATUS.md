@@ -10,6 +10,6 @@
 | 6 | Feature Verification | ✅ |
 | 7 | User Acceptance | ✅ |
 
-## Current Iteration (v1.9)
+## Current Iteration (v1.10)
 
-切換數據源：export/ 核心數據 + raw-data/ 活動數據，修復 / 日期格式
+新增二次充值會員指標 + 修復環比負值方向錯誤
