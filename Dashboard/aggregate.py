@@ -269,13 +269,17 @@ def aggregate(source, activity_source=None, base=None, only_keys=None):
         gv = game.setdefault(d, {}).setdefault(venue_display(venue), [0.0, 0.0, 0.0, 0])
         gv[0] += bet; gv[1] += payout; gv[2] += eff; gv[3] += 1
 
-    # 会员首次充值金额（用於資金修正→彩金識別）
+    # 會員首次充值金額（用於資金修正→彩金識別）
     first_dep = {}
     for _d, _dep, _wd, _mid in cash.values():
         if _dep > 0 and _mid:
             cur = first_dep.get(_mid)
             if cur is None or _d < cur[0]:
                 first_dep[_mid] = (_d, _dep)
+
+    # 手動派發活動彩金（資金修正→新人首充100%豪礼）
+    _MANUAL_ACT_KEY = ("充值活动", "2075493545907064832")
+    _manual_bonus = {}  # 日 -> 累計 {触发,到帐,次数,触发人数,领取人数}
 
     for d, t, amt, mid in ledger.values():
         if not d:
@@ -288,6 +292,14 @@ def aggregate(source, activity_source=None, base=None, only_keys=None):
             fc = first_dep.get(mid)
             if fc and abs(amt - fc[1]) < 0.01 and d >= fc[0]:
                 a[4] += amt
+                # 同時注入活動彩金快照
+                acc = _manual_bonus.setdefault(d, {"触发": 0.0, "到帐": 0.0,
+                      "次数": 0, "触发人数": set(), "领取人数": set()})
+                acc["触发"] += amt
+                acc["到帐"] += amt
+                acc["次数"] += 1
+                acc["触发人数"].add(mid)
+                acc["领取人数"].add(mid)
         elif any(w in t for w in ("活动", "活動", "彩金", "奖励", "獎勵")):  # 彩金 / 活動獎勵
             a[4] += amt
 
@@ -299,6 +311,22 @@ def aggregate(source, activity_source=None, base=None, only_keys=None):
             a[0] += dep; a[1] += 1; a[2].add(mid)
         if wd > 0:
             a[3] += wd; a[4] += 1; a[5].add(mid)
+
+    # 將手動派發彩金合併到活動快照
+    if _manual_bonus:
+        for d, acc in _manual_bonus.items():
+            m = activity_snaps.setdefault(d, {})
+            cur = m.get(_MANUAL_ACT_KEY, {})
+            m[_MANUAL_ACT_KEY] = {
+                "触发": cur.get("触发", 0.0) + acc["触发"],
+                "到帐": cur.get("到帐", 0.0) + acc["到帐"],
+                "次数": cur.get("次数", 0) + acc["次数"],
+                "触发人数": cur.get("触发人数", 0) + len(acc["触发人数"]),
+                "领取人数": cur.get("领取人数", 0) + len(acc["领取人数"]),
+                "领取率": round((cur.get("领取人数", 0) + len(acc["领取人数"])) /
+                             (cur.get("触发人数", 0) + len(acc["触发人数"])) * 100, 2)
+                             if (cur.get("触发人数", 0) + len(acc["触发人数"])) else 0.0,
+            }
 
     # ---- 二次充值会员：会员ID -> 累積充值次數，取第二次充值日 ----
     from collections import defaultdict as _dd
@@ -618,6 +646,7 @@ KNOWN_ACTIVITY_NAMES = {
     ("充值活动", "2064338446452465664"): "每日充值回馈",
     ("充值活动", "2072527153187643392"): "新人首充100%豪礼",
     ("充值活动", "2072532512957681664"): "每日充值回馈",
+    ("充值活动", "2075493545907064832"): "新人首充100%豪礼",
     ("负盈利", "2064364752562868224"): "老虎救援金",
     ("负盈利", "2064355390268166144"): "真人视讯转运金",
 }
