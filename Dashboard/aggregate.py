@@ -314,8 +314,23 @@ def aggregate(source, activity_source=None, base=None, only_keys=None):
 
     # 將手動派發彩金合併到活動快照
     if _manual_bonus:
-        for d, acc in _manual_bonus.items():
+        prev_snaps = sorted(activity_snaps.keys())
+        for d in sorted(_manual_bonus.keys()):
             m = activity_snaps.setdefault(d, {})
+            # 從前一個快照複製所有活動（累計值）
+            if prev_snaps:
+                prev_d = None
+                for sd in prev_snaps:
+                    if sd < d:
+                        prev_d = sd
+                if prev_d and prev_d in activity_snaps:
+                    for key, val in activity_snaps[prev_d].items():
+                        if key not in m:
+                            m[key] = dict(val)
+            prev_snaps.append(d)
+            prev_snaps.sort()
+
+            acc = _manual_bonus[d]
             cur = m.get(_MANUAL_ACT_KEY, {})
             m[_MANUAL_ACT_KEY] = {
                 "触发": cur.get("触发", 0.0) + acc["触发"],
