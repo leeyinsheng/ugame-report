@@ -2,7 +2,7 @@ import pytest
 import sys
 sys.path.insert(0, "Dashboard")
 
-from aggregate import _activity_display, _bonus_for, _monthly_stats, _weekly_stats
+from aggregate import _activity_display, _bonus_for, _monthly_stats, _weekly_stats, daypart
 
 
 class TestActivityDisplay:
@@ -339,3 +339,18 @@ class TestWeeklyStats:
     def test_empty_input(self):
         result = _weekly_stats([], {}, {}, {}, {})
         assert result == []
+
+
+class TestDaypart:
+    def test_dash_format(self):
+        assert daypart("2026-06-22 16:24:15（美东时间）") == "2026-06-22"
+
+    def test_slash_format(self):
+        assert daypart("2026/07/12 01:42:26（美东时间）") == "2026-07-12"
+
+    def test_short_date(self):
+        assert daypart("2026-06-22") == "2026-06-22"
+
+    def test_invalid(self):
+        assert daypart("") == ""
+        assert daypart("abc") == ""

@@ -90,15 +90,32 @@ class OssSource:
 
 
 def from_env(local_root):
-    """按环境变量决定数据源：设了 OSS_BUCKET 用 OSS，否则用本地目录。"""
+    """按环境变量决定数据源：设了 OSS_BUCKET 用 OSS，否则用本地目录。
+    返回 (source, kind) 或 (source, kind, activity_source)。"""
     if os.environ.get("OSS_BUCKET"):
-        return OssSource(
-            endpoint=os.environ["OSS_ENDPOINT"],
+        endpoint = os.environ.get("OSS_ENDPOINT", "")
+        if not endpoint.startswith("https://") and not endpoint.startswith("http://"):
+            endpoint = "https://" + endpoint
+        region = os.environ.get("OSS_REGION") or None
+        key_id = os.environ.get("OSS_ACCESS_KEY_ID")
+        key_secret = os.environ.get("OSS_ACCESS_KEY_SECRET")
+        ram_role = os.environ.get("OSS_RAM_ROLE") or None
+        main = OssSource(
+            endpoint=endpoint,
             bucket=os.environ["OSS_BUCKET"],
             prefix=os.environ.get("OSS_PREFIX", "raw-data/"),
-            region=os.environ.get("OSS_REGION") or None,
-            key_id=os.environ.get("OSS_ACCESS_KEY_ID"),
-            key_secret=os.environ.get("OSS_ACCESS_KEY_SECRET"),
-            ram_role=os.environ.get("OSS_RAM_ROLE") or None,
-        ), "OSS"
+            region=region,
+            key_id=key_id, key_secret=key_secret, ram_role=ram_role,
+        )
+        act_prefix = os.environ.get("OSS_ACTIVITY_PREFIX")
+        if act_prefix:
+            act_src = OssSource(
+                endpoint=endpoint,
+                bucket=os.environ["OSS_BUCKET"],
+                prefix=act_prefix,
+                region=region,
+                key_id=key_id, key_secret=key_secret, ram_role=ram_role,
+            )
+            return main, "OSS", act_src
+        return main, "OSS"
     return LocalSource(local_root), "本地目录"

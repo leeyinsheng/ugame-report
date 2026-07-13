@@ -26,15 +26,20 @@ import sources
 BASE = os.path.dirname(os.path.abspath(__file__))
 RAW = os.path.join(BASE, "raw-data")
 
-SOURCE, SOURCE_KIND = sources.from_env(RAW)
+_src = sources.from_env(RAW)
+SOURCE = _src[0]
+SOURCE_KIND = _src[1]
+ACTIVITY_SOURCE = _src[2] if len(_src) > 2 else None
 
 _cache = {"sig": None, "data": None}
 
 
 def get_summary():
     sig = SOURCE.signature()
+    if ACTIVITY_SOURCE:
+        sig = (sig, ACTIVITY_SOURCE.signature())
     if sig != _cache["sig"]:
-        _cache["data"] = aggregate.aggregate(SOURCE)
+        _cache["data"] = aggregate.aggregate(SOURCE, ACTIVITY_SOURCE)
         _cache["sig"] = sig
     return _cache["data"]
 

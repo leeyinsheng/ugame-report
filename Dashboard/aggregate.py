@@ -32,9 +32,11 @@ def num(s):
 
 
 def daypart(s):
-    """日期时间 '2026-06-22 16:24:15（美东时间）' -> '2026-06-22'"""
+    """日期时间 '2026-06-22 16:24:15（美东时间）' 或 '2026/07/12 01:42:26' -> '2026-06-22'"""
     s = (s or "").strip()
-    return s[:10] if len(s) >= 10 and s[4] == "-" else ""
+    if len(s) >= 10 and s[4] in ("-", "/"):
+        return s[:10].replace("/", "-")
+    return ""
 
 
 def pct(s):
@@ -121,12 +123,13 @@ def classify(cols):
     return None
 
 
-def aggregate(source):
+def aggregate(source, activity_source=None):
     """聚合数据源中的 CSV，返回 { 'YYYY-MM-DD': {rev,mem,cp} }（按日期排序）。
 
     source 可以是：
       · 字符串（本地目录路径，自动包成 LocalSource）
       · 任意带 .iter_csv() 的数据源对象（LocalSource / OssSource）
+    activity_source: 可选，独立的活动数据源（如 OSS 不同前缀）
     """
     if isinstance(source, str):
         from sources import LocalSource
@@ -204,6 +207,32 @@ def aggregate(source):
                         dep = amt if "充" in t else 0.0
                         wd = amt if "提" in t else 0.0
                     cash[k] = (daypart(row.get("完成时间")), dep, wd, row.get("会员ID") or "")
+
+    # 从独立活动数据源补充活动快照
+    if activity_source:
+        for name, order_key, f in activity_source.iter_csv():
+            with f:
+                r = csv.DictReader(f)
+                kind = classify(r.fieldnames or [])
+                if kind != "activity":
+                    continue
+                snap = date_from_name(name)
+                if snap:
+                    m = activity_snaps.setdefault(snap, {})
+                    for row in r:
+                        nm = (pick(row, "活动名称", "活動名稱") or "").strip()
+                        aid = (pick(row, "活动 ID", "活動 ID", "活動ID") or "").strip()
+                        if not nm:
+                            continue
+                        key = (nm, aid)
+                        m[key] = {
+                            "触发": num(pick(row, "触发彩金总金额", "觸發彩金總金額")),
+                            "到帐": num(pick(row, "到帐彩金总金额", "到帳彩金總金額")),
+                            "次数": int(num(pick(row, "触发彩金总次数", "觸發彩金總次數"))),
+                            "触发人数": int(num(pick(row, "触发会员总人数", "觸發會員總人數"))),
+                            "领取人数": int(num(pick(row, "领取彩金会员总人数", "領取彩金會員總人數"))),
+                            "领取率": pct(pick(row, "活动领取率", "活動領取率")),
+                        }
 
     # ---- 按日汇总 ----
     # rev: [投注, 有效, 派彩, 实际返水(账变), 彩金, set(活跃会员), 预计返水(注单), 注单量]

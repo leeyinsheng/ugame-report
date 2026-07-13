@@ -5,11 +5,11 @@
 | 1 | Product Ideation | ✅ |
 | 2 | Product Design | ✅ |
 | 3 | Feature Dev + Unit Tests | ⏳ |
-| 4 | Code Review | ✅ |
-| 5 | Regression Testing | ✅ |
-| 6 | Feature Verification | ✅ |
-| 7 | User Acceptance | ✅ |
+| 4 | Code Review | |
+| 5 | Regression Testing | |
+| 6 | Feature Verification | |
+| 7 | User Acceptance | |
 
-## Current Iteration (v1.8)
+## Current Iteration (v1.9)
 
-看板新增週統計頁籤（ISO 週一至週日、8 項核心指標、前週環比）
+切換數據源：export/ 核心數據 + raw-data/ 活動數據，修復 / 日期格式
