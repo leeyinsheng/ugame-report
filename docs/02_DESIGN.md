@@ -1,61 +1,34 @@
-# Phase 2 產品設計 — 週統計頁籤
+# v1.13 設計 — 週/月統計新增 GGR 指標
 
-## 概述
+## 變更範圍
 
-在現有月統計基礎上，新增「週統計」頁籤，顯示 8 項核心指標的**週度**彙總與前週環比。
+只有 3 個檔案會異動：
 
-## 後端設計
+### 1. `Dashboard/aggregate.py` — 後端彙總
 
-### `_weekly_stats(days, rev, cp, reg_by_day, fc_by_day, today=None)`
+**`_monthly_stats()`：**
+- `months` default dict 新增 `ggr` 暫存（`0.0`）
+- 彙總迴圈內：`m["ggr"] += bet - pay`
+- 輸出 entry 新增 `"GGR": round(m["ggr"], 2)`
+- 環比清單加入 `"GGR"` key
 
-```
-for each day in days:
-    ym = 該日所屬 ISO 週: f"{year}-W{week:02d}"（週一至週日）
-    彙總同 _monthly_stats 邏輯
+**`_weekly_stats()`：**
+- 同上模式修改
 
-每週輸出:
-    週次: "2026-W27"
-    日期段: "06/29 → 07/05"
-    8 指標, 前週環比%, 進行中
-```
+### 2. `Dashboard/index.html` — 前端表格
 
-**ISO 週計算**：`datetime.date.fromisoformat(d).isocalendar()[1]` → 週號（1-53）
+- `MONTHLY_COLS` 陣列在 `['投注总额','m']` 之後、`['净利润NGR','m']` 之前插入 `['GGR','m']`
 
-**進行中判斷**：該週的最後一天（週日）≤ today → 已結，否則進行中
+### 3. `tests/test_aggregate.py` — 測試
 
-### 聚合輸出
+- 既有月/週測試斷言新增 `"GGR"` 欄位驗證
 
-在 `aggregate()` 中加入（同 monthly 模式）：
-```python
-weekly = _weekly_stats(days, rev, cp, reg_by_day, fc_by_day)
-out["_meta"]["weekly"] = weekly
-```
+## 資料流
 
-## 前端設計
+無架構變更，純欄位追加。
 
-### 導航列
+## 無需改動
 
-```
-[ 运营看板 | 週統計 | 月統計 ]
-```
-
-三個頁籤並列，點擊切換對應 board div。
-
-### 週統計表格
-
-| 週次 | 日期段 | 投注总额 | NGR | 有效打码 | 充值 | 提现 | 活跃 | 新注册 | 首充 |
-|------|--------|----------|-----|----------|------|------|------|--------|------|
-
-- 最新週在上，倒排
-- 本週 ⏳ 進行中，已結 ✓
-- 每格數值 + ▲/▼ 前週環比%
-- 首週顯示「—」
-- 橫向捲動，第一、二欄 sticky
-
-## 檔案修改
-
-| 檔案 | 變更 |
-|------|------|
-| `Dashboard/aggregate.py` | 新增 `_weekly_stats()`，aggregate() 注入 `_meta.weekly` |
-| `Dashboard/index.html` | 導航列 + `weekly_board` div、`renderWeekly()`、tab 邏輯更新 |
-| `tests/test_aggregate.py` | 新增 `TestWeeklyStats` 測試類 |
+- `server.py` / `sources.py` — API 結構不變
+- 每日看板 — GGR 已存在
+- activity/bonus 邏輯 — 不受影響
