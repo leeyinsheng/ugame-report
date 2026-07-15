@@ -1,0 +1,304 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head><script data-od-sandbox-shim>(function(){
+  function makeStore(){
+    var data = {};
+    var api = {
+      getItem: function(k){ return Object.prototype.hasOwnProperty.call(data, k) ? data[k] : null; },
+      setItem: function(k, v){ data[k] = String(v); },
+      removeItem: function(k){ delete data[k]; },
+      clear: function(){ data = {}; },
+      key: function(i){ return Object.keys(data)[i] || null; }
+    };
+    Object.defineProperty(api, 'length', { get: function(){ return Object.keys(data).length; } });
+    return api;
+  }
+  function tryShim(name){
+    var works = false;
+    try { works = !!window[name] && typeof window[name].getItem === 'function'; void window[name].length; }
+    catch (_) { works = false; }
+    if (works) return;
+    try { Object.defineProperty(window, name, { configurable: true, value: makeStore() }); }
+    catch (_) { try { window[name] = makeStore(); } catch (__) {} }
+  }
+  tryShim('localStorage');
+  tryShim('sessionStorage');
+  document.addEventListener('click', (e) => {
+    if (!e.target || !(e.target instanceof Element)) return;
+    var link = e.target.closest('a[href]');
+    if (!link) return;
+    var href = link.getAttribute('href');
+    if (href === null) return;
+    var isAnchor = href.startsWith('#') || href === '';
+    if (isAnchor) {
+      e.preventDefault();
+      if (href === '' || href === '#') {
+        window.scrollTo({ top: 0 });
+        history.replaceState(null, '', ' ');
+      } else {
+        var targetId = href.slice(1);
+        var target = targetId ? document.getElementById(targetId) : null;
+        if (target) {
+          target.scrollIntoView();
+          location.hash === href && history.replaceState(null, '', ' ');
+          location.hash = href;
+        }
+      }
+    } else if (link.getAttribute('target') === '_blank') {
+      e.preventDefault();
+      let safe = false;
+      try {
+        var url = new URL(href, location.href);
+        safe =
+          url.protocol === 'http:' ||
+          url.protocol === 'https:' ||
+          url.protocol === 'mailto:';
+      } catch (_) {}
+      safe && window.open(href, '_blank', 'noopener,noreferrer');
+    }
+  });
+})();</script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>系統維護公告 — U Game</title>
+<style>
+:root {
+  --bg:      oklch(99% 0.002 240);
+  --surface: oklch(100% 0 0);
+  --fg:      oklch(18% 0.012 250);
+  --muted:   oklch(54% 0.012 250);
+  --border:  oklch(92% 0.005 250);
+  --accent:  oklch(58% 0.18 255);
+
+  --font-display: -apple-system, BlinkMacSystemFont, 'SF Pro Display', system-ui, sans-serif;
+  --font-body:    -apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, sans-serif;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html {
+  font-family: var(--font-body);
+  color: var(--fg);
+  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.notice {
+  max-width: 640px;
+  width: 100%;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 48px 40px;
+}
+
+.notice-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 32px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.notice-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: var(--accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.notice-icon svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: #fff;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.notice-title {
+  font-family: var(--font-display);
+  font-size: 24px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--fg);
+}
+
+.notice-intro {
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--fg);
+  margin-bottom: 28px;
+}
+
+.info-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 28px;
+}
+
+.info-row {
+  display: flex;
+  gap: 8px;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.info-label {
+  color: var(--muted);
+  white-space: nowrap;
+  min-width: 88px;
+  flex-shrink: 0;
+}
+
+.info-value {
+  color: var(--fg);
+  font-weight: 500;
+}
+
+.info-value em {
+  font-style: normal;
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.notes {
+  background: oklch(from var(--bg) l c h / 50%);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 20px 24px;
+  margin-bottom: 28px;
+}
+
+.notes-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 12px;
+}
+
+.notes-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.notes-list li {
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--fg);
+  padding-left: 16px;
+  position: relative;
+}
+
+.notes-list li::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 9px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--accent);
+  opacity: 0.5;
+}
+
+.notice-footer {
+  border-top: 1px solid var(--border);
+  padding-top: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.notice-footer p {
+  font-size: 14px;
+  line-height: 1.6;
+  text-align: center;
+}
+
+.notice-footer .apology {
+  color: var(--muted);
+}
+
+.notice-footer .signature {
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--fg);
+  margin-top: 4px;
+}
+
+@media (max-width: 480px) {
+  body { padding: 16px; align-items: flex-start; padding-top: 40px; }
+  .notice { padding: 32px 24px; border-radius: 10px; }
+  .notice-title { font-size: 20px; }
+  .info-row { flex-direction: column; gap: 2px; }
+  .info-label { min-width: auto; }
+}
+</style>
+</head>
+<body>
+
+<div class="notice" role="main">
+  <div class="notice-header">
+    <div class="notice-icon">
+      <svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+    </div>
+    <h1 class="notice-title">系統維護公告</h1>
+  </div>
+
+  <p class="notice-intro">親愛的會員您好：為提供更穩定、優質的服務體驗，本站將於以下時間進行系統維護作業：</p>
+
+  <div class="info-grid">
+    <div class="info-row">
+      <span class="info-label">維護時間</span>
+      <span class="info-value">2026-07-01（三）13:00 ~ 15:00 <em>（北京時間）</em></span>
+    </div>
+    <div class="info-row">
+      <span class="info-label">影響範圍</span>
+      <span class="info-value">維護期間全站暫停服務（包含登入、存款、投注、提現等）</span>
+    </div>
+    <div class="info-row">
+      <span class="info-label">預計恢復</span>
+      <span class="info-value">下午 15:00 正常開放</span>
+    </div>
+  </div>
+
+  <div class="notes">
+    <div class="notes-title">注意事項</div>
+    <ul class="notes-list">
+      <li>請避免在維護期間進行任何操作，以免資料異常</li>
+      <li>維護完成後如遇任何問題，請聯繫 24 小時在線客服</li>
+      <li>若有提前完成或延長維護，將另行公告</li>
+    </ul>
+  </div>
+
+  <div class="notice-footer">
+    <p class="apology">造成不便，敬請見諒，感謝您的支持與理解！</p>
+    <p class="signature">—— U Game 運營團隊</p>
+  </div>
+</div>
+
+</body>
+</html>

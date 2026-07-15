@@ -522,6 +522,8 @@ def _monthly_stats(days, rev, cp, reg_by_day, fc_by_day, today_ym=None):
             "月份": ym,
             "投注总额": round(m["投注额"], 2),
             "GGR": round(m["ggr"], 2),
+            "到帐彩金": round(m["彩金"], 2),
+            "实际返水": round(m["返水"], 2),
             "净利润NGR": round(ngr, 2),
             "有效打码": round(m["有效打码"], 2),
             "充值总额": round(m["充值额"], 2),
@@ -535,7 +537,7 @@ def _monthly_stats(days, rev, cp, reg_by_day, fc_by_day, today_ym=None):
 
         if i > 0:
             prev = result[i - 1]
-            for k in ["投注总额", "GGR", "净利润NGR", "有效打码", "充值总额", "提现总额",
+            for k in ["投注总额", "GGR", "到帐彩金", "实际返水", "净利润NGR", "有效打码", "充值总额", "提现总额",
                       "活跃会员", "新增注册", "首充会员"]:
                 pv = prev[k]
                 cv = entry[k]
@@ -602,6 +604,8 @@ def _weekly_stats(days, rev, cp, reg_by_day, fc_by_day, today=None):
             "日期段": date_range,
             "投注总额": round(m["投注额"], 2),
             "GGR": round(m["ggr"], 2),
+            "到帐彩金": round(m["彩金"], 2),
+            "实际返水": round(m["返水"], 2),
             "净利润NGR": round(ngr, 2),
             "有效打码": round(m["有效打码"], 2),
             "充值总额": round(m["充值额"], 2),
@@ -616,7 +620,7 @@ def _weekly_stats(days, rev, cp, reg_by_day, fc_by_day, today=None):
 
         if i > 0:
             prev = result[i - 1]
-            for k in ["投注总额", "GGR", "净利润NGR", "有效打码", "充值总额", "提现总额",
+            for k in ["投注总额", "GGR", "到帐彩金", "实际返水", "净利润NGR", "有效打码", "充值总额", "提现总额",
                       "活跃会员", "新增注册", "首充会员"]:
                 pv = prev[k]
                 cv = entry[k]

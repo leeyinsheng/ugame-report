@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>U.Game 运营数据看板</title>
+<style>
+  :root{
+    --blue:#1f3864;--blue2:#2f5496;--accent:#2f5496;--bg:#f4f6fa;--card:#ffffff;
+    --line:#e6eaf0;--muted:#8a94a6;--green:#1a9e6a;--red:#d6455d;--txt:#1d2433;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
+    background:var(--bg);color:var(--txt);font-size:15px;line-height:1.4;}
+  .wrap{max-width:520px;margin:0 auto;padding:0 14px 40px;}
+  header{position:sticky;top:0;z-index:10;background:linear-gradient(135deg,var(--blue),var(--blue2));
+    color:#fff;margin:0 -14px 14px;padding:16px 18px 14px;border-radius:0 0 18px 18px;box-shadow:0 4px 16px rgba(31,56,100,.18);}
+  header h1{margin:0;font-size:18px;font-weight:700;letter-spacing:.5px;}
+  header .sub{font-size:12px;opacity:.85;margin-top:3px;}
+  .pills{display:flex;gap:8px;overflow-x:auto;padding:12px 0 4px;-webkit-overflow-scrolling:touch;scrollbar-width:none;}
+  .pills::-webkit-scrollbar{display:none;}
+  .pill{flex:0 0 auto;padding:8px 14px;border-radius:20px;background:rgba(255,255,255,.18);color:#fff;
+    font-size:13px;font-weight:600;border:1px solid rgba(255,255,255,.25);cursor:pointer;transition:.15s;}
+  .pill.on{background:#fff;color:var(--blue);border-color:#fff;}
+  .kpis{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px;}
+  .kpi{background:var(--card);border-radius:14px;padding:13px 14px;box-shadow:0 2px 10px rgba(31,56,100,.06);}
+  .kpi .lab{font-size:12px;color:var(--muted);}
+  .kpi .val{font-size:20px;font-weight:700;margin-top:4px;letter-spacing:.3px;}
+  .kpi .dlt{font-size:12px;margin-top:3px;font-weight:600;}
+  .up{color:var(--green);} .down{color:var(--red);}
+  .sec{background:var(--card);border-radius:16px;margin-bottom:16px;box-shadow:0 2px 10px rgba(31,56,100,.06);overflow:hidden;}
+  .sec h2{margin:0;font-size:15px;font-weight:700;color:var(--blue);padding:14px 16px;border-bottom:1px solid var(--line);
+    display:flex;align-items:center;gap:8px;}
+  .sec h2 .bar{width:4px;height:16px;background:var(--accent);border-radius:3px;}
+  table{width:100%;border-collapse:collapse;}
+  td{padding:11px 16px;font-size:14px;border-bottom:1px solid var(--line);}
+  tr:last-child td{border-bottom:none;}
+  td.k{color:#46506a;}
+  td.v{text-align:right;font-weight:600;font-variant-numeric:tabular-nums;}
+  td.d{text-align:right;font-size:12px;width:62px;font-weight:600;}
+  .chart-wrap{padding:6px 10px 14px;}
+  .chart-t{font-size:13px;color:#46506a;font-weight:600;padding:12px 16px 2px;display:flex;justify-content:space-between;}
+  .chart-t span{color:var(--blue);font-weight:700;}
+  svg{display:block;width:100%;height:auto;}
+  .note{font-size:11px;color:var(--muted);text-align:center;margin-top:8px;line-height:1.6;}
+  .seg{display:flex;gap:6px;padding:10px 14px 2px;overflow-x:auto;scrollbar-width:none;}
+  .seg::-webkit-scrollbar{display:none;}
+  .seg button{flex:0 0 auto;background:#eef1f7;border:none;border-radius:18px;padding:7px 13px;font-size:12.5px;
+    font-weight:600;color:#46506a;cursor:pointer;}
+  .seg button.on{background:var(--accent);color:#fff;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>U.Game 运营数据看板</h1>
+    <div class="sub">核心营收 · 会员 · 充提　|　币种：USDT</div>
+    <div class="pills" id="pills"></div>
+  </header>
+
+  <div class="kpis" id="kpis"></div>
+
+  <div class="sec">
+    <h2><span class="bar"></span>趋势走势</h2>
+    <div class="seg" id="seg"></div>
+    <div class="chart-t" id="chartT"></div>
+    <div class="chart-wrap"><div id="chart"></div></div>
+    <div class="note">点击上方日期可高亮当日 · 共 5 天</div>
+  </div>
+
+  <div class="sec">
+    <h2><span class="bar"></span>核心营收指标</h2>
+    <table id="t_rev"></table>
+  </div>
+  <div class="sec">
+    <h2><span class="bar"></span>会员指标</h2>
+    <table id="t_mem"></table>
+  </div>
+  <div class="sec">
+    <h2><span class="bar"></span>充提指标</h2>
+    <table id="t_cp"></table>
+  </div>
+  <div class="note">数据来源：U.Game 每日运营总览（按派彩结算日 / 充提完成时间统计）<br>NGR = GGR − 彩金 − 返水（不含代理佣金）</div>
+</div>
+
+<script>
+const DATA = {"2026-06-18": {"rev": {"投注总额": 46550.25, "有效打码": 45960.79, "派彩总额": 43164.12, "GGR": 3386.13, "彩金": 46.99, "返水": 128.29, "NGR": 3210.85, "毛利率": 7.27, "净利率": 6.9}, "mem": {"累计注册": 358, "新增注册": 9, "活跃会员": 15, "首充会员": 4, "新客首充率": 44.44, "活跃率": 4.19, "人均投注": 3103.35, "人均充值": 671.29, "ARPU": 214.06}, "cp": {"充值总额": 4699.0, "充值笔数": 8, "充值人数": 7, "提现总额": 2889.0, "提现笔数": 6, "提现人数": 6, "充提差额": 1810.0, "充提比率": 1.63}}, "2026-06-19": {"rev": {"投注总额": 45762.6, "有效打码": 45558.2, "派彩总额": 38832.32, "GGR": 6930.28, "彩金": 68.25, "返水": 449.88, "NGR": 6412.15, "毛利率": 15.14, "净利率": 14.01}, "mem": {"累计注册": 366, "新增注册": 8, "活跃会员": 10, "首充会员": 2, "新客首充率": 25.0, "活跃率": 2.73, "人均投注": 4576.26, "人均充值": 1456.25, "ARPU": 641.21}, "cp": {"充值总额": 5825.0, "充值笔数": 6, "充值人数": 4, "提现总额": 77.0, "提现笔数": 2, "提现人数": 2, "充提差额": 5748.0, "充提比率": 75.65}}, "2026-06-20": {"rev": {"投注总额": 30578.0, "有效打码": 29495.4, "派彩总额": 28569.6, "GGR": 2008.4, "彩金": 11.0, "返水": 131.09, "NGR": 1866.31, "毛利率": 6.57, "净利率": 6.1}, "mem": {"累计注册": 398, "新增注册": 32, "活跃会员": 10, "首充会员": 0, "新客首充率": 0.0, "活跃率": 2.51, "人均投注": 3057.8, "人均充值": 366.67, "ARPU": 186.63}, "cp": {"充值总额": 1100.0, "充值笔数": 3, "充值人数": 3, "提现总额": 0.0, "提现笔数": 0, "提现人数": 0, "充提差额": 1100.0, "充提比率": 0}}, "2026-06-21": {"rev": {"投注总额": 4119.0, "有效打码": 3808.42, "派彩总额": 4690.15, "GGR": -571.15, "彩金": 1.0, "返水": 145.18, "NGR": -717.33, "毛利率": -13.87, "净利率": -17.42}, "mem": {"累计注册": 408, "新增注册": 10, "活跃会员": 7, "首充会员": 0, "新客首充率": 0.0, "活跃率": 1.72, "人均投注": 588.43, "人均充值": 100.0, "ARPU": -102.48}, "cp": {"充值总额": 100.0, "充值笔数": 1, "充值人数": 1, "提现总额": 131.0, "提现笔数": 1, "提现人数": 1, "充提差额": -31.0, "充提比率": 0.76}}, "2026-06-22": {"rev": {"投注总额": 46852.54, "有效打码": 46212.01, "派彩总额": 47349.51, "GGR": -496.97, "彩金": 5.41, "返水": 153.86, "NGR": -656.23, "毛利率": -1.06, "净利率": -1.4}, "mem": {"累计注册": 434, "新增注册": 26, "活跃会员": 8, "首充会员": 1, "新客首充率": 3.85, "活跃率": 1.84, "人均投注": 5856.57, "人均充值": 187.75, "ARPU": -82.03}, "cp": {"充值总额": 751.0, "充值笔数": 5, "充值人数": 4, "提现总额": 662.0, "提现笔数": 2, "提现人数": 2, "充提差额": 89.0, "充提比率": 1.13}}};
+const DAYS = Object.keys(DATA);
+let cur = DAYS.length-1;       // 默认最新日
+let metricKey = "投注总额";    // 趋势默认指标
+
+const md = d=>d.slice(5);      // 06-22
+// 字段配置: [显示名, 取值路径, 格式]  fmt: m=金额, i=整数, p=百分比, x=倍率
+const REV=[["投注总额","rev.投注总额","m"],["有效打码","rev.有效打码","m"],["派彩总额","rev.派彩总额","m"],
+  ["平台毛利润 GGR","rev.GGR","m"],["彩金费用","rev.彩金","m"],["返水费用","rev.返水","m"],
+  ["平台净利润 NGR","rev.NGR","m"],["毛利率","rev.毛利率","p"],["净利率","rev.净利率","p"]];
+const MEM=[["累计注册会员","mem.累计注册","i"],["当日新增注册","mem.新增注册","i"],["当日活跃会员","mem.活跃会员","i"],
+  ["当日首充会员","mem.首充会员","i"],["新客首充率","mem.新客首充率","p"],["活跃率","mem.活跃率","p"],
+  ["人均投注额","mem.人均投注","m"],["人均充值额","mem.人均充值","m"],["ARPU","mem.ARPU","m"]];
+const CP=[["当日充值总额","cp.充值总额","m"],["充值笔数","cp.充值笔数","i"],["充值人数","cp.充值人数","i"],
+  ["当日提现总额","cp.提现总额","m"],["提现笔数","cp.提现笔数","i"],["提现人数","cp.提现人数","i"],
+  ["充提差额","cp.充提差额","m"],["充提比率","cp.充提比率","x"]];
+
+const get=(d,path)=>path.split('.').reduce((o,k)=>o[k],DATA[d]);
+function fmt(v,t){
+  if(t==='p')return v.toFixed(2)+'%';
+  if(t==='x')return v.toFixed(2);
+  if(t==='i')return v.toLocaleString('en-US');
+  return v.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+}
+function delta(d,path,t){
+  const i=DAYS.indexOf(d); if(i<=0)return '';
+  const a=get(d,path),b=get(DAYS[i-1],path);
+  if(b===0&&a===0)return '<span style="color:#b6bdcc">—</span>';
+  let txt,cls;
+  if(t==='p'||t==='x'){const diff=a-b;cls=diff>=0?'up':'down';txt=(diff>=0?'▲':'▼')+Math.abs(diff).toFixed(2);}
+  else if(b===0){cls='up';txt='▲ 新增';}
+  else{const pct=(a-b)/Math.abs(b)*100;cls=pct>=0?'up':'down';txt=(pct>=0?'▲':'▼')+Math.abs(pct).toFixed(0)+'%';}
+  return `<span class="${cls}">${txt}</span>`;
+}
+
+// ---- 顶部 KPI ----
+function renderKPI(){
+  const d=DAYS[cur];
+  const items=[["投注总额","rev.投注总额","m"],["平台净利润 NGR","rev.NGR","m"],
+    ["当日活跃会员","mem.活跃会员","i"],["充提差额","cp.充提差额","m"]];
+  document.getElementById('kpis').innerHTML=items.map(([lab,p,t])=>{
+    const v=get(d,p),neg=(t==='m'&&v<0);
+    return `<div class="kpi"><div class="lab">${lab}</div>
+      <div class="val" style="color:${neg?'var(--red)':'var(--blue)'}">${fmt(v,t)}</div>
+      <div class="dlt">${delta(d,p,t)||'<span style="color:#b6bdcc">首日</span>'}</div></div>`;
+  }).join('');
+}
+
+// ---- 日期 pills ----
+function renderPills(){
+  document.getElementById('pills').innerHTML=DAYS.map((d,i)=>
+    `<div class="pill ${i===cur?'on':''}" onclick="setDay(${i})">${md(d)}</div>`).join('');
+}
+function setDay(i){cur=i;renderPills();renderKPI();renderTables();renderChart();}
+
+// ---- 明细表 ----
+function tbl(id,cfg){
+  const d=DAYS[cur];
+  document.getElementById(id).innerHTML=cfg.map(([name,p,t])=>{
+    const v=get(d,p),neg=(t==='m'&&v<0);
+    return `<tr><td class="k">${name}</td>
+      <td class="v" style="color:${neg?'var(--red)':'inherit'}">${fmt(v,t)}</td>
+      <td class="d">${delta(d,p,t)}</td></tr>`;
+  }).join('');
+}
+function renderTables(){tbl('t_rev',REV);tbl('t_mem',MEM);tbl('t_cp',CP);}
+
+// ---- 趋势图 ----
+const TRENDS=[["投注总额","rev.投注总额","m"],["平台净利润 NGR","rev.NGR","m"],
+  ["活跃会员","mem.活跃会员","i"],["充提差额","cp.充提差额","m"],["毛利率","rev.毛利率","p"]];
+function renderSeg(){
+  document.getElementById('seg').innerHTML=TRENDS.map(([n,p])=>
+    `<button class="${n===metricKey?'on':''}" onclick="setMetric('${n}')">${n}</button>`).join('');
+}
+function setMetric(n){metricKey=n;renderSeg();renderChart();}
+function renderChart(){
+  const cfg=TRENDS.find(t=>t[0]===metricKey),path=cfg[1],t=cfg[2];
+  const vals=DAYS.map(d=>get(d,path));
+  const W=480,H=180,pl=10,pr=10,pt=24,pb=26;
+  let mn=Math.min(...vals,0),mx=Math.max(...vals,0);
+  if(mn===mx){mx=mn+1;}
+  const sx=i=>pl+(W-pl-pr)*(DAYS.length===1?0.5:i/(DAYS.length-1));
+  const sy=v=>pt+(H-pt-pb)*(1-(v-mn)/(mx-mn));
+  const zeroY=sy(0);
+  let pts=vals.map((v,i)=>`${sx(i)},${sy(v)}`).join(' ');
+  let area=`${sx(0)},${zeroY} `+pts+` ${sx(DAYS.length-1)},${zeroY}`;
+  let dots=vals.map((v,i)=>{
+    const on=i===cur,neg=v<0;
+    return `<circle cx="${sx(i)}" cy="${sy(v)}" r="${on?5:3.5}" fill="${on?'#fff':(neg?'#d6455d':'#2f5496')}" stroke="${neg?'#d6455d':'#2f5496'}" stroke-width="${on?3:1.5}"/>`+
+      (on?`<text x="${sx(i)}" y="${sy(v)-12}" text-anchor="middle" font-size="12" font-weight="700" fill="${neg?'#d6455d':'#1f3864'}">${fmt(v,t)}</text>`:'');
+  }).join('');
+  let labs=DAYS.map((d,i)=>`<text x="${sx(i)}" y="${H-8}" text-anchor="middle" font-size="11" fill="${i===cur?'#1f3864':'#8a94a6'}" font-weight="${i===cur?'700':'400'}">${md(d)}</text>`).join('');
+  const zline=(mn<0&&mx>0)?`<line x1="${pl}" y1="${zeroY}" x2="${W-pr}" y2="${zeroY}" stroke="#cfd6e4" stroke-dasharray="3 3" stroke-width="1"/>`:'';
+  document.getElementById('chart').innerHTML=
+   `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet">
+      <defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="#2f5496" stop-opacity=".18"/><stop offset="1" stop-color="#2f5496" stop-opacity="0"/>
+      </linearGradient></defs>
+      <polygon points="${area}" fill="url(#g)"/>
+      ${zline}
+      <polyline points="${pts}" fill="none" stroke="#2f5496" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+      ${dots}${labs}
+    </svg>`;
+  document.getElementById('chartT').innerHTML=`${metricKey} 走势 <span>${fmt(get(DAYS[cur],path),t)}</span>`;
+}
+
+renderPills();renderKPI();renderSeg();renderTables();renderChart();
+</script>
+</body>
+</html>

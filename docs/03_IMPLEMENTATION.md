@@ -1,19 +1,16 @@
-# v1.13 實作摘要 — 週/月統計新增 GGR 指標
+# v1.14 實作摘要 — 週/月統計新增到帳彩金與實際返水
 
 ## 變更檔案
 
 ### `Dashboard/aggregate.py`
-- `_monthly_stats()`: 新增 `"ggr"` 暫存、累積 `m["ggr"] += bet - pay`、輸出 `"GGR"`、加入環比清單
-- `_weekly_stats()`: 同上模式
+- `_monthly_stats()`: entry 新增 `"到帐彩金"`、`"实际返水"`；環比清單新增對應 key
+- `_weekly_stats()`: 同上
 
 ### `Dashboard/index.html`
-- `MONTHLY_COLS` 陣列在 `['投注总额','m']` 之後插入 `['GGR','m']`
+- `MONTHLY_COLS` 插入 `['到帐彩金','m'],['实际返水','m']`（GGR 後、NGR 前）
 
 ### `tests/test_aggregate.py`
-- `TestMonthlyStats.test_basic_aggregation`: 驗證 GGR = 30.0
-- `TestMonthlyStats.test_huanbi_calculation`: 驗證 GGR 環比 = 100.0%
-- `TestWeeklyStats.test_basic_aggregation`: 驗證 GGR = 30.0
-- `TestWeeklyStats.test_wow_calculation`: 驗證 GGR 前週環比 = 50.0%
+- 4 項斷言驗證到帳彩金與實際返水值
 
 ## 測試結果
 

@@ -19,3 +19,6 @@ Dashboard/raw-data/
 
 # 后台导出的大体量原始数据，不入库
 數據分析/後台導出/
+.gstack/
+.env
+test_oss.py

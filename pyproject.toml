@@ -5,3 +5,8 @@ build-backend = "setuptools.backends._legacy:_Backend"
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["Dashboard"]
+
+[dependency-groups]
+test = [
+    "pytest>=9.1.1",
+]

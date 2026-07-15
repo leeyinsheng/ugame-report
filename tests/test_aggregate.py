@@ -186,6 +186,8 @@ class TestMonthlyStats:
         assert jun["新增注册"] == 8
         assert jun["首充会员"] == 3
         assert jun["GGR"] == 30.0
+        assert jun["到帐彩金"] == 9.0
+        assert jun["实际返水"] == 6.0
         assert jun["净利润NGR"] == pytest.approx(300 - (90+180) - (2+4) - (3+6), 0.01)
 
     def test_active_member_dedup(self):
@@ -215,6 +217,8 @@ class TestMonthlyStats:
         hb = jul["环比"]
         assert hb["投注总额"] == 100.0       # (200/100-1)*100
         assert hb["GGR"] == 100.0            # (100/50-1)*100
+        assert hb["到帐彩金"] is None        # pv=0 → 除零
+        assert hb["实际返水"] is None         # pv=0 → 除零
         assert hb["新增注册"] == 100.0       # (20/10-1)*100
         assert hb["活跃会员"] == 0.0         # 1->1 no change
 
@@ -278,6 +282,8 @@ class TestWeeklyStats:
         assert w26["首充会员"] == 3
         ngr26 = 300 - (90+180) - (2+4) - (3+6)
         assert w26["GGR"] == 30.0
+        assert w26["到帐彩金"] == 9.0
+        assert w26["实际返水"] == 6.0
         assert w26["净利润NGR"] == pytest.approx(ngr26, 0.01)
         assert w26["进行中"] is False
 
@@ -301,6 +307,8 @@ class TestWeeklyStats:
         wow = result[0]["前週环比%"]  # W27 newest, has环比 vs W26
         assert wow["投注总额"] == 50.0        # (300/200-1)*100
         assert wow["GGR"] == 50.0             # (150/100-1)*100
+        assert wow["到帐彩金"] is None        # pv=0
+        assert wow["实际返水"] is None         # pv=0
         assert wow["新增注册"] == 50.0        # (15/10-1)*100
         assert wow["活跃会员"] == 0.0         # 1->1
 

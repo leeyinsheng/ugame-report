@@ -376,7 +376,7 @@ function renderChart(){
 }
 function showState(html){document.getElementById('state').style.display='block';document.getElementById('state').innerHTML=html;document.getElementById('board').style.display='none';document.getElementById('monthly_board').style.display='none';document.getElementById('weekly_board').style.display='none';document.getElementById('datenav').style.display='none';}
 let currentTab='daily';
-const MONTHLY_COLS=[['投注总额','m'],['GGR','m'],['净利润NGR','m'],['有效打码','m'],['充值总额','m'],['提现总额','m'],['活跃会员','i'],['新增注册','i'],['首充会员','i']];
+const MONTHLY_COLS=[['投注总额','m'],['GGR','m'],['到帐彩金','m'],['实际返水','m'],['净利润NGR','m'],['有效打码','m'],['充值总额','m'],['提现总额','m'],['活跃会员','i'],['新增注册','i'],['首充会员','i']];
 function switchTab(tab){
   currentTab=tab;
   document.getElementById('nav-daily').className=tab==='daily'?'on':'';

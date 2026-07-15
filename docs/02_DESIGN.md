@@ -1,34 +1,37 @@
-# v1.13 設計 — 週/月統計新增 GGR 指標
+# v1.14 設計 — 週/月統計新增到帳彩金與實際返水
 
 ## 變更範圍
 
-只有 3 個檔案會異動：
+3 個檔案：
 
 ### 1. `Dashboard/aggregate.py` — 後端彙總
 
 **`_monthly_stats()`：**
-- `months` default dict 新增 `ggr` 暫存（`0.0`）
-- 彙總迴圈內：`m["ggr"] += bet - pay`
-- 輸出 entry 新增 `"GGR": round(m["ggr"], 2)`
-- 環比清單加入 `"GGR"` key
+- entry 新增 `"到帐彩金": round(m["彩金"], 2)`（放在 GGR 之後）
+- entry 新增 `"实际返水": round(m["返水"], 2)`（放到帐彩金之後）
+- 環比清單 `["投注总额", "GGR", "到帐彩金", "实际返水", "净利润NGR", ...]`
 
 **`_weekly_stats()`：**
-- 同上模式修改
+- 同上模式
 
-### 2. `Dashboard/index.html` — 前端表格
+### 2. `Dashboard/index.html` — 前端
 
-- `MONTHLY_COLS` 陣列在 `['投注总额','m']` 之後、`['净利润NGR','m']` 之前插入 `['GGR','m']`
+`MONTHLY_COLS` 修改：
+```
+['投注总额','m'], ['GGR','m'], ['到帐彩金','m'], ['实际返水','m'],
+['净利润NGR','m'], ...
+```
 
 ### 3. `tests/test_aggregate.py` — 測試
 
-- 既有月/週測試斷言新增 `"GGR"` 欄位驗證
+- 既有月/週測試斷言新增到帳彩金與實際返水驗證
 
 ## 資料流
 
-無架構變更，純欄位追加。
+無架構變更，純欄位追加。NGR（淨利潤 NGR）計算公式不變：`NGR = GGR - 到帳彩金 - 實際返水`。
 
-## 無需改動
+## 最終欄位順序
 
-- `server.py` / `sources.py` — API 結構不變
-- 每日看板 — GGR 已存在
-- activity/bonus 邏輯 — 不受影響
+```
+月份/週次 → 投注總額 → GGR → 到帳彩金 → 實際返水 → 淨利潤 NGR → 有效打碼 → ...
+```
