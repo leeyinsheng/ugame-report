@@ -115,6 +115,11 @@ def venue_display(name):
         if clean_key.startswith(prefix) and len(clean_key) <= len(prefix) + 3:
             return display
 
+    # 4) pattern fallback for deeply corrupted names (wrong valid chars, not U+FFFD)
+    if "体育" in clean:
+        if clean.startswith("皇") or "冠" in clean:
+            return "皇冠体育"
+
     return raw or "其他"
 
 

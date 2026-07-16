@@ -40,7 +40,7 @@ SOURCE_KIND = _src[1]
 ACTIVITY_SOURCE = _src[2] if len(_src) > 2 else None
 
 CACHE_DIR = "/tmp/ugame-dashboard-cache"
-CACHE_FILE = os.path.join(CACHE_DIR, "state.pkl")
+CACHE_FILE = os.path.join(BASE, "state.pkl")
 DB_PATH = os.path.join(BASE, "data.db")
 PID_FILE = os.path.join(CACHE_DIR, ".pid")
 
