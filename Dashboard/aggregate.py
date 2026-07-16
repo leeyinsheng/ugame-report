@@ -67,7 +67,7 @@ VENUE_DISPLAY = {
     "jili slots": "JILI 电子",
     "jili poker": "JILI 棋牌",
     "jili fish": "JILI 捕鱼",
-    "pp zh slots": "PP 电子",
+    "pp zh slots": "PP 电子", "pp电子": "PP 电子", "pp電子": "PP 电子",
     "wg": "WG 电子", "wg电子": "WG 电子", "wg電子": "WG 电子",
     "db_live": "DB 视讯",
     "体育": "U 体育", "體育": "U 体育",
@@ -77,12 +77,45 @@ VENUE_DISPLAY = {
     # 以下场馆数据中出现但未在对应表内，暂用默认名（如需改名请补充）：
     "皇冠体育": "皇冠体育", "皇冠體育": "皇冠体育",
     "沙巴体育": "沙巴体育", "沙巴體育": "沙巴体育",
+    "熊猫体育": "熊猫体育", "熊猫體育": "熊猫体育",
 }
+
+# 编码损坏时的前缀回退（按英文/中文前缀匹配）
+import re as _re
+_VENUE_PREFIX = [
+    ("pp", "PP 电子"),
+    ("pg", "PG 电子"),
+    ("wg", "WG 电子"),
+    ("体", "U 体育"),
+    ("皇冠", "皇冠体育"),
+    ("沙巴", "沙巴体育"),
+    ("熊猫", "熊猫体育"),
+]
 
 
 def venue_display(name):
     raw = (name or "").strip()
-    return VENUE_DISPLAY.get(raw.lower(), raw or "其他")
+    key = raw.lower()
+
+    # 1) exact match
+    result = VENUE_DISPLAY.get(key)
+    if result:
+        return result
+
+    # 2) strip encoding garbage (U+FFFD replacement chars + control chars)
+    clean = _re.sub(r'[\ufffd\ufffe\uffff\0-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f]+', '', raw)
+    clean_key = clean.lower()
+    if clean_key != key:
+        result = VENUE_DISPLAY.get(clean_key)
+        if result:
+            return result
+
+    # 3) prefix fallback for known venues with broken suffix
+    for prefix, display in _VENUE_PREFIX:
+        if clean_key.startswith(prefix) and len(clean_key) <= len(prefix) + 3:
+            return display
+
+    return raw or "其他"
 
 
 def _has(cols, *names):

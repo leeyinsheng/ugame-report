@@ -368,6 +368,43 @@ class TestDaypart:
         assert daypart("abc") == ""
 
 
+import sys
+sys.path.insert(0, "Dashboard")
+from aggregate import venue_display
+
+
+class TestVenueDisplay:
+    def test_pp_zh_slots(self):
+        assert venue_display("PP ZH SLOTS") == "PP 电子"
+
+    def test_pp_dianzi_chinese(self):
+        assert venue_display("PP电子") == "PP 电子"
+
+    def test_pp_broken_encoding(self):
+        assert venue_display("PP电\ufffd\ufffd") == "PP 电子"
+
+    def test_wg_electronics(self):
+        assert venue_display("WG电子") == "WG 电子"
+
+    def test_wg_broken(self):
+        assert venue_display("WG电\ufffd") == "WG 电子"
+
+    def test_sports_broken(self):
+        assert venue_display("体\ufffd\ufffd\ufffd") == "U 体育"
+
+    def test_huangguan_broken(self):
+        assert venue_display("皇冠\ufffd") == "皇冠体育"
+
+    def test_panda_sports(self):
+        assert venue_display("熊猫体育") == "熊猫体育"
+
+    def test_unknown_kept_as_is(self):
+        assert venue_display("未知场馆") == "未知场馆"
+
+    def test_empty(self):
+        assert venue_display("") == "其他"
+
+
 import io
 import sys
 sys.path.insert(0, "Dashboard")

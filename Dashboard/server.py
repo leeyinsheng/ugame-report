@@ -96,10 +96,6 @@ def get_summary():
     curr_files = _build_file_map(SOURCE)
     state = _load_state()
 
-    if not state or not state.get("files"):
-        if os.path.exists(DB_PATH):
-            os.remove(DB_PATH)
-
     if state and state.get("files") == curr_files:
         return state["data"]
 
