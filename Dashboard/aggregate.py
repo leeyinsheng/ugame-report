@@ -182,7 +182,8 @@ def _init_schema(conn):
 
         CREATE TABLE IF NOT EXISTS changes (
             flow_id TEXT PRIMARY KEY, change_date TEXT DEFAULT '',
-            raw_type TEXT DEFAULT '', amount REAL DEFAULT 0, member_id TEXT DEFAULT ''
+            raw_type TEXT DEFAULT '', amount REAL DEFAULT 0,
+            member_id TEXT DEFAULT '', remark TEXT DEFAULT ''
         );
         CREATE INDEX IF NOT EXISTS idx_changes_date ON changes(change_date);
 
@@ -234,10 +235,11 @@ def _import_csv(conn, name, reader):
             rows.append((k, daypart(pick(row, "账变时间", "帐变时间")),
                          (pick(row, "账变类型", "帐变类型") or ""),
                          num(pick(row, "账变金额", "帐变金额")),
-                         row.get("会员ID") or ""))
+                         row.get("会员ID") or "",
+                         pick(row, "备注", "備註") or ""))
         if rows:
             conn.executemany(
-                "INSERT OR IGNORE INTO changes VALUES (?,?,?,?,?)", rows)
+                "INSERT OR IGNORE INTO changes VALUES (?,?,?,?,?,?)", rows)
         conn.commit()
         return kind
     if kind == "cashflow":
@@ -382,28 +384,42 @@ def aggregate(source, activity_source=None, base=None, only_keys=None):
     ):
         first_dep[mid] = (dep_date, dep_amt)
 
-    # ---- 手動派發活動彩金（資金修正→新人首充100%豪礼）----
+    # ---- 手動派發活動彩金（資金修正→新人首充100%豪礼 + 新用户二存专属福利）----
     _MANUAL_ACT_KEY = ("充值活动", "2075493545907064832")
+    _MANUAL_ACT_KEY_2 = ("充值活动", "2077719965773901824")
     _manual_bonus = {}
+    _manual_bonus_2 = {}
 
-    for d, t, amt, mid in conn.execute(
-        "SELECT change_date, raw_type, amount, member_id FROM changes "
+    for d, t, amt, mid, remark in conn.execute(
+        "SELECT change_date, raw_type, amount, member_id, remark FROM changes "
         "WHERE change_date != '' ORDER BY change_date"
     ):
         a = rev.setdefault(d, [0.0, 0.0, 0.0, 0.0, 0.0, set(), 0.0, 0])
         if "返水" in t:
             a[3] += round(amt or 0, 2)
         elif "资金修正" in t and mid:
-            fc = first_dep.get(mid)
-            if fc and abs(round(amt or 0, 2) - fc[1]) < 0.01 and d >= fc[0]:
+            # 新用户二存：備注含关键字
+            if "新用户二存专属福利" in (remark or ""):
                 a[4] += round(amt or 0, 2)
-                acc = _manual_bonus.setdefault(d, {"触发": 0.0, "到帐": 0.0,
+                acc = _manual_bonus_2.setdefault(d, {"触发": 0.0, "到帐": 0.0,
                       "次数": 0, "触发人数": set(), "领取人数": set()})
                 acc["触发"] += round(amt or 0, 2)
                 acc["到帐"] += round(amt or 0, 2)
                 acc["次数"] += 1
                 acc["触发人数"].add(mid)
                 acc["领取人数"].add(mid)
+            else:
+                # 新人首充：金額匹配首次充值
+                fc = first_dep.get(mid)
+                if fc and abs(round(amt or 0, 2) - fc[1]) < 0.01 and d >= fc[0]:
+                    a[4] += round(amt or 0, 2)
+                    acc = _manual_bonus.setdefault(d, {"触发": 0.0, "到帐": 0.0,
+                          "次数": 0, "触发人数": set(), "领取人数": set()})
+                    acc["触发"] += round(amt or 0, 2)
+                    acc["到帐"] += round(amt or 0, 2)
+                    acc["次数"] += 1
+                    acc["触发人数"].add(mid)
+                    acc["领取人数"].add(mid)
         elif any(w in t for w in ("活动", "活動", "彩金", "奖励", "獎勵")):
             a[4] += round(amt or 0, 2)
 
@@ -440,6 +456,36 @@ def aggregate(source, activity_source=None, base=None, only_keys=None):
             acc = _manual_bonus[d]
             cur = m.get(_MANUAL_ACT_KEY, {})
             m[_MANUAL_ACT_KEY] = {
+                "触发": cur.get("触发", 0.0) + acc["触发"],
+                "到帐": cur.get("到帐", 0.0) + acc["到帐"],
+                "次数": cur.get("次数", 0) + acc["次数"],
+                "触发人数": cur.get("触发人数", 0) + len(acc["触发人数"]),
+                "领取人数": cur.get("领取人数", 0) + len(acc["领取人数"]),
+                "领取率": round((cur.get("领取人数", 0) + len(acc["领取人数"])) /
+                             (cur.get("触发人数", 0) + len(acc["触发人数"])) * 100, 2)
+                             if (cur.get("触发人数", 0) + len(acc["触发人数"])) else 0.0,
+            }
+
+    # ---- 合併二存手動彩金 ----
+    if _manual_bonus_2:
+        prev_snaps = sorted(activity_snaps.keys())
+        for d in sorted(_manual_bonus_2.keys()):
+            m = activity_snaps.setdefault(d, {})
+            if prev_snaps:
+                prev_d = None
+                for sd in prev_snaps:
+                    if sd < d:
+                        prev_d = sd
+                if prev_d and prev_d in activity_snaps:
+                    for key, val in activity_snaps[prev_d].items():
+                        if key not in m:
+                            m[key] = dict(val)
+            prev_snaps.append(d)
+            prev_snaps.sort()
+
+            acc = _manual_bonus_2[d]
+            cur = m.get(_MANUAL_ACT_KEY_2, {})
+            m[_MANUAL_ACT_KEY_2] = {
                 "触发": cur.get("触发", 0.0) + acc["触发"],
                 "到帐": cur.get("到帐", 0.0) + acc["到帐"],
                 "次数": cur.get("次数", 0) + acc["次数"],
@@ -775,6 +821,7 @@ KNOWN_ACTIVITY_NAMES = {
     ("充值活动", "2072527153187643392"): "新人首充100%豪礼",
     ("充值活动", "2072532512957681664"): "每日充值回馈",
     ("充值活动", "2075493545907064832"): "新人首充100%豪礼",
+    ("充值活动", "2077719965773901824"): "新用户二存专属福利",
     ("负盈利", "2064364752562868224"): "老虎救援金",
     ("负盈利", "2064355390268166144"): "真人视讯转运金",
 }
