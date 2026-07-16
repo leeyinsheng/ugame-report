@@ -41,6 +41,7 @@ ACTIVITY_SOURCE = _src[2] if len(_src) > 2 else None
 
 CACHE_DIR = "/tmp/ugame-dashboard-cache"
 CACHE_FILE = os.path.join(CACHE_DIR, "state.pkl")
+DB_PATH = os.path.join(BASE, "data.db")
 PID_FILE = os.path.join(CACHE_DIR, ".pid")
 
 
@@ -91,34 +92,25 @@ def _build_file_map(source):
 
 
 def get_summary():
-    _init_cache()
-
     curr_files = _build_file_map(SOURCE)
     state = _load_state()
 
-    # 快取命中 → 直接回傳
-    cached_files = state.get("files") if state else None
-    if cached_files and cached_files == curr_files:
+    if state and state.get("files") == curr_files:
         return state["data"]
 
-    # 找出新增/變更的檔案 → 只下載這些
     new_keys = None
-    if cached_files and state.get("intermediate"):
+    if state and state.get("files"):
+        prev_files = state["files"]
         new_keys = set()
         for name, (size, mtime, oss_key) in curr_files.items():
-            prev = cached_files.get(name)
-            if prev is None or prev[:2] != (size, mtime):
+            pv = prev_files.get(name)
+            if pv is None or pv[:2] != (size, mtime):
                 new_keys.add(oss_key)
         if not new_keys:
-            new_keys = None  # 無新檔 → 全量（活動源可能變更）
+            new_keys = None
 
-    if state and state.get("intermediate"):
-        inter = state["intermediate"]
-        data, inter = aggregate.aggregate(SOURCE, ACTIVITY_SOURCE, base=inter, only_keys=new_keys)
-    else:
-        data, inter = aggregate.aggregate(SOURCE, ACTIVITY_SOURCE)
-
-    _save_state({"files": curr_files, "data": data, "intermediate": inter})
+    data, _ = aggregate(SOURCE, ACTIVITY_SOURCE, base=DB_PATH, only_keys=new_keys)
+    _save_state({"files": curr_files, "data": data})
     return data
 
 

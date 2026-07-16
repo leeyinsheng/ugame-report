@@ -16,8 +16,9 @@ U.Game 运营数据看板 —— 原始数据聚合引擎
 去重：注单按「本平台单号」、充提按「订单号」、账变按「流水号」去重，
       因此重复 / 跨日范围文件多次上传也不会重复计算。
 """
-import csv, os, re
+import csv, os, re, sqlite3
 from datetime import date, timedelta
+from collections import defaultdict as _dd
 
 
 def num(s):
@@ -123,6 +124,145 @@ def classify(cols):
     return None
 
 
+# ---- SQLite 中间层 ----
+
+def _init_schema(conn):
+    conn.executescript("""
+        CREATE TABLE IF NOT EXISTS bets (
+            id TEXT PRIMARY KEY, bet_date TEXT NOT NULL DEFAULT '',
+            member_id TEXT DEFAULT '', amount REAL DEFAULT 0,
+            valid_amount REAL DEFAULT 0, payout REAL DEFAULT 0,
+            rebate REAL DEFAULT 0, venue TEXT DEFAULT ''
+        );
+        CREATE INDEX IF NOT EXISTS idx_bets_date ON bets(bet_date);
+
+        CREATE TABLE IF NOT EXISTS charges (
+            order_id TEXT PRIMARY KEY, charge_date TEXT NOT NULL DEFAULT '',
+            type TEXT DEFAULT '', amount REAL DEFAULT 0, member_id TEXT DEFAULT ''
+        );
+        CREATE INDEX IF NOT EXISTS idx_charges_date ON charges(charge_date);
+
+        CREATE TABLE IF NOT EXISTS changes (
+            flow_id TEXT PRIMARY KEY, change_date TEXT DEFAULT '',
+            raw_type TEXT DEFAULT '', amount REAL DEFAULT 0, member_id TEXT DEFAULT ''
+        );
+        CREATE INDEX IF NOT EXISTS idx_changes_date ON changes(change_date);
+
+        CREATE TABLE IF NOT EXISTS members (
+            member_id TEXT PRIMARY KEY,
+            register_date TEXT DEFAULT '', first_deposit_date TEXT DEFAULT ''
+        );
+
+        CREATE TABLE IF NOT EXISTS activities (
+            snapshot_date TEXT NOT NULL, activity_name TEXT NOT NULL,
+            activity_id TEXT NOT NULL, triggered REAL DEFAULT 0,
+            credited REAL DEFAULT 0, times INTEGER DEFAULT 0,
+            triggered_members INTEGER DEFAULT 0, claimed_members INTEGER DEFAULT 0,
+            claim_rate REAL DEFAULT 0,
+            PRIMARY KEY (snapshot_date, activity_name, activity_id)
+        );
+    """)
+    conn.commit()
+
+
+def _import_csv(conn, name, reader):
+    kind = classify(reader.fieldnames or [])
+    if kind is None:
+        return kind
+    if kind == "bet":
+        rows = []
+        for row in reader:
+            k = row.get("本平台单号") or ""
+            if not k:
+                continue
+            rows.append((k, daypart(row.get("派彩日期时间")),
+                         row.get("会员ID") or "",
+                         num(row.get("投注金额")),
+                         num(pick(row, "有效投注", "有效投注金额", "有效打码")),
+                         num(row.get("派彩金额")),
+                         num(pick(row, "返水", "预计返水", "預計返水")),
+                         (pick(row, "游戏场馆", "遊戲場館") or "其他").strip() or "其他"))
+        if rows:
+            conn.executemany(
+                "INSERT OR IGNORE INTO bets VALUES (?,?,?,?,?,?,?,?)", rows)
+        conn.commit()
+        return kind
+    if kind == "ledger":
+        rows = []
+        for row in reader:
+            k = row.get("流水号") or ""
+            if not k:
+                continue
+            rows.append((k, daypart(pick(row, "账变时间", "帐变时间")),
+                         (pick(row, "账变类型", "帐变类型") or ""),
+                         num(pick(row, "账变金额", "帐变金额")),
+                         row.get("会员ID") or ""))
+        if rows:
+            conn.executemany(
+                "INSERT OR IGNORE INTO changes VALUES (?,?,?,?,?)", rows)
+        conn.commit()
+        return kind
+    if kind == "cashflow":
+        rows = []
+        for row in reader:
+            status = (pick(row, "订单状态", "状态") or "").strip()
+            if not ("成功" in status or "完成" in status):
+                continue
+            k = row.get("订单号") or ""
+            if not k:
+                continue
+            if "充值金额" in row or "提现金额" in row:
+                dep, wd = num(row.get("充值金额")), num(row.get("提现金额"))
+            else:
+                amt = num(row.get("金额")); t = row.get("类型") or ""
+                dep = amt if "充" in t else 0.0
+                wd = amt if "提" in t else 0.0
+            rows.append((k, daypart(row.get("完成时间")), "充值",
+                         dep, row.get("会员ID") or ""))
+            if wd > 0:
+                rows.append((k + "_wd", daypart(row.get("完成时间")), "提现",
+                             wd, row.get("会员ID") or ""))
+        if rows:
+            conn.executemany(
+                "INSERT OR IGNORE INTO charges VALUES (?,?,?,?,?)", rows)
+        conn.commit()
+        return kind
+    if kind == "member":
+        rows = []
+        for row in reader:
+            mid = (pick(row, "会员ID", "会员 ID") or "").strip()
+            if mid:
+                rows.append((mid, daypart(row.get("注册日期时间")),
+                             daypart(row.get("第一次充值成功的日期时间"))))
+        if rows:
+            conn.executemany(
+                "INSERT OR REPLACE INTO members VALUES (?,?,?)", rows)
+        conn.commit()
+        return kind
+    if kind == "activity":
+        snap = date_from_name(name)
+        if snap:
+            rows = []
+            for row in reader:
+                nm = (pick(row, "活动名称", "活動名稱") or "").strip()
+                aid = (pick(row, "活动 ID", "活動 ID", "活動ID") or "").strip()
+                if not nm:
+                    continue
+                rows.append((snap, nm, aid,
+                             num(pick(row, "触发彩金总金额", "觸發彩金總金額")),
+                             num(pick(row, "到帐彩金总金额", "到帳彩金總金額")),
+                             int(num(pick(row, "触发彩金总次数", "觸發彩金總次數"))),
+                             int(num(pick(row, "触发会员总人数", "觸發會員總人數"))),
+                             int(num(pick(row, "领取彩金会员总人数", "領取彩金會員總人數"))),
+                             pct(pick(row, "活动领取率", "活動領取率"))))
+            if rows:
+                conn.executemany(
+                    "INSERT OR REPLACE INTO activities VALUES (?,?,?,?,?,?,?,?,?)", rows)
+            conn.commit()
+        return kind
+    return None
+
+
 def aggregate(source, activity_source=None, base=None, only_keys=None):
     """聚合数据源中的 CSV，返回 (output, intermediate) 元组。
 
@@ -130,194 +270,123 @@ def aggregate(source, activity_source=None, base=None, only_keys=None):
       · 字符串（本地目录路径，自动包成 LocalSource）
       · 任意带 .iter_csv() 的数据源对象（LocalSource / OssSource）
     activity_source: 可选，独立的活动数据源（如 OSS 不同前缀）
-    base: 可选，已有的中间状态（用于增量更新），格式 {bets,ledger,cash,member_map,activity_snaps}
+    base: 可选，sqlite3.Connection 或 db_path 字符串（用于增量更新）
     only_keys: 可选，仅处理指定文件名集合（OSS object key 或本地文件名）"""
 
     if isinstance(source, str):
         from sources import LocalSource
         source = LocalSource(source)
 
-    # 去重容器（从 base 继承或新建）
-    if base:
-        bets = dict(base.get("bets", {}))
-        ledger = dict(base.get("ledger", {}))
-        cash = dict(base.get("cash", {}))
-        member_map = dict(base.get("member_map", {}))
-        activity_snaps = dict(base.get("activity_snaps", {}))
+    if isinstance(base, sqlite3.Connection):
+        conn = base
+    elif isinstance(base, str) and base != ":memory:" and os.path.exists(base):
+        conn = sqlite3.connect(base)
     else:
-        bets = {}        # 本平台单号 -> (派彩日, 会员ID, 投注, 有效, 派彩)
-        ledger = {}      # 流水号    -> (日, 类型, 金额)
-        cash = {}        # 订单号    -> (日, 充值, 提现, 会员ID)
-        member_map = {}  # 会员ID -> row（合併所有日期的會員檔）
-        activity_snaps = {}  # 快照日 -> {(活动名称, 活动ID): ...}（累计值）
+        conn = sqlite3.connect(":memory:")
+    _init_schema(conn)
 
+    # ---- 汇入 CSV 到 SQLite ----
     for name, order_key, f in source.iter_csv(only_keys):
         with f:
-            r = csv.DictReader(f)
-            kind = classify(r.fieldnames or [])
-            if kind is None:
-                continue
-            if kind == "activity":
-                snap = date_from_name(name)   # 活动文件日期取自文件名
-                if snap:
-                    m = activity_snaps.setdefault(snap, {})
-                    for row in r:
-                        nm = (pick(row, "活动名称", "活動名稱") or "").strip()
-                        aid = (pick(row, "活动 ID", "活動 ID", "活動ID") or "").strip()
-                        if not nm:
-                            continue
-                        key = (nm, aid)
-                        m[key] = {
-                            "触发": num(pick(row, "触发彩金总金额", "觸發彩金總金額")),
-                            "到帐": num(pick(row, "到帐彩金总金额", "到帳彩金總金額")),
-                            "次数": int(num(pick(row, "触发彩金总次数", "觸發彩金總次數"))),
-                            "触发人数": int(num(pick(row, "触发会员总人数", "觸發會員總人數"))),
-                            "领取人数": int(num(pick(row, "领取彩金会员总人数", "領取彩金會員總人數"))),
-                            "领取率": pct(pick(row, "活动领取率", "活動領取率")),
-                        }
-                continue
-            if kind == "member":
-                for row in r:
-                    mid = (pick(row, "会员ID", "会员 ID") or "").strip()
-                    if mid:
-                        member_map[mid] = row
-                continue
-            for row in r:
-                if kind == "bet":
-                    k = row.get("本平台单号") or ""
-                    if not k:
-                        continue
-                    # 有效打码列名三种写法：有效投注 / 有效投注金额 / 有效打码
-                    # 返水列名：返水 / 预计返水 / 預計返水（新导出为"返水"）
-                    bets[k] = (daypart(row.get("派彩日期时间")), row.get("会员ID") or "",
-                               num(row.get("投注金额")),
-                               num(pick(row, "有效投注", "有效投注金额", "有效打码")),
-                               num(row.get("派彩金额")),
-                               num(pick(row, "返水", "预计返水", "預計返水")),
-                               (pick(row, "游戏场馆", "遊戲場館") or "其他").strip() or "其他")
-                elif kind == "ledger":
-                    k = row.get("流水号") or ""
-                    if not k:
-                        continue
-                    ledger[k] = (daypart(pick(row, "账变时间", "帐变时间")),
-                                 (pick(row, "账变类型", "帐变类型") or ""),
-                                 num(pick(row, "账变金额", "帐变金额")),
-                                 row.get("会员ID") or "")
-                elif kind == "cashflow":
-                    # 状态列两种写法；成功口径含「成功 / 已成功 / 已完成」，排除失败
-                    status = (pick(row, "订单状态", "状态") or "").strip()
-                    if not ("成功" in status or "完成" in status):
-                        continue
-                    k = row.get("订单号") or ""
-                    if not k:
-                        continue
-                    if "充值金额" in row or "提现金额" in row:   # 有独立充值/提现金额列
-                        dep, wd = num(row.get("充值金额")), num(row.get("提现金额"))
-                    else:                                        # 单一金额列：靠「类型」判方向
-                        amt = num(row.get("金额")); t = row.get("类型") or ""
-                        dep = amt if "充" in t else 0.0
-                        wd = amt if "提" in t else 0.0
-                    cash[k] = (daypart(row.get("完成时间")), dep, wd, row.get("会员ID") or "")
+            _import_csv(conn, name, csv.DictReader(f))
 
-    # 从独立活动数据源补充活动快照
     if activity_source:
-        for name, order_key, f in activity_source.iter_csv():
+        for name, order_key, f in activity_source.iter_csv(only_keys):
             with f:
-                r = csv.DictReader(f)
-                kind = classify(r.fieldnames or [])
-                if kind != "activity":
-                    continue
-                snap = date_from_name(name)
-                if snap:
-                    m = activity_snaps.setdefault(snap, {})
-                    for row in r:
-                        nm = (pick(row, "活动名称", "活動名稱") or "").strip()
-                        aid = (pick(row, "活动 ID", "活動 ID", "活動ID") or "").strip()
-                        if not nm:
-                            continue
-                        key = (nm, aid)
-                        m[key] = {
-                            "触发": num(pick(row, "触发彩金总金额", "觸發彩金總金額")),
-                            "到帐": num(pick(row, "到帐彩金总金额", "到帳彩金總金額")),
-                            "次数": int(num(pick(row, "触发彩金总次数", "觸發彩金總次數"))),
-                            "触发人数": int(num(pick(row, "触发会员总人数", "觸發會員總人數"))),
-                            "领取人数": int(num(pick(row, "领取彩金会员总人数", "領取彩金會員總人數"))),
-                            "领取率": pct(pick(row, "活动领取率", "活動領取率")),
-                        }
+                _import_csv(conn, name, csv.DictReader(f))
 
-    # ---- 按日汇总 ----
+    # ---- 按日汇总（从 SQLite 查询） ----
     # rev: [投注, 有效, 派彩, 实际返水(账变), 彩金, set(活跃会员), 预计返水(注单), 注单量]
     rev = {}
-    cp = {}    # 日 -> [充值额, 充值笔, set(充值人), 提现额, 提现笔, set(提现人)]
 
-    def _rev(d):
-        return rev.setdefault(d, [0.0, 0.0, 0.0, 0.0, 0.0, set(), 0.0, 0])
+    for date, bet, eff, pay, rebate, cnt, mem_str in conn.execute(
+        "SELECT bet_date, SUM(amount), SUM(valid_amount), SUM(payout), "
+        "SUM(rebate), COUNT(*), GROUP_CONCAT(DISTINCT member_id) "
+        "FROM bets WHERE bet_date != '' GROUP BY bet_date"
+    ):
+        members = set(mem_str.split(',')) if mem_str else set()
+        rev[date] = [round(bet or 0, 2), round(eff or 0, 2), round(pay or 0, 2),
+                     0.0, 0.0, members, round(rebate or 0, 2), cnt or 0]
 
-    def _cp(d):
-        return cp.setdefault(d, [0.0, 0, set(), 0.0, 0, set()])
+    # game: 日 -> {游戏场馆: [投注总额, 派彩总额, 有效打码, 注单量]}
+    game = {}
+    for date, venue, bet, pay, eff, cnt in conn.execute(
+        "SELECT bet_date, venue, SUM(amount), SUM(payout), "
+        "SUM(valid_amount), COUNT(*) FROM bets WHERE bet_date != '' "
+        "GROUP BY bet_date, venue ORDER BY bet_date"
+    ):
+        vn = venue_display(venue)
+        gv = game.setdefault(date, {}).setdefault(vn, [0.0, 0.0, 0.0, 0])
+        gv[0] += bet or 0; gv[1] += pay or 0; gv[2] += eff or 0; gv[3] += cnt or 0
 
-    game = {}  # 日 -> {游戏场馆: [投注总额, 派彩总额, 有效打码, 注单量]}
+    # cp: 日 -> [充值额, 充值笔, set(充值人), 提现额, 提现笔, set(提现人)]
+    cp = {}
+    for date, dep, dcnt, dmem, wd, wcnt, wmem in conn.execute(
+        "SELECT charge_date, "
+        "SUM(CASE WHEN type='充值' THEN amount ELSE 0 END), "
+        "COUNT(CASE WHEN type='充值' AND amount>0 THEN 1 END), "
+        "GROUP_CONCAT(DISTINCT CASE WHEN type='充值' AND amount>0 THEN member_id END), "
+        "SUM(CASE WHEN type='提现' THEN amount ELSE 0 END), "
+        "COUNT(CASE WHEN type='提现' AND amount>0 THEN 1 END), "
+        "GROUP_CONCAT(DISTINCT CASE WHEN type='提现' AND amount>0 THEN member_id END) "
+        "FROM charges WHERE charge_date != '' GROUP BY charge_date"
+    ):
+        ds = set(dmem.split(',')) if dmem else set()
+        ws = set(wmem.split(',')) if wmem else set()
+        cp[date] = [round(dep or 0, 2), dcnt or 0, ds,
+                    round(wd or 0, 2), wcnt or 0, ws]
 
-    for d, mid, bet, eff, payout, est, venue in bets.values():
-        if not d:
-            continue
-        a = _rev(d)
-        a[0] += bet; a[1] += eff; a[2] += payout
-        a[5].add(mid)
-        a[6] += est                    # 预计返水（来自注单明细）
-        a[7] += 1                      # 注单量
-        gv = game.setdefault(d, {}).setdefault(venue_display(venue), [0.0, 0.0, 0.0, 0])
-        gv[0] += bet; gv[1] += payout; gv[2] += eff; gv[3] += 1
-
-    # 會員首次充值金額（用於資金修正→彩金識別）
+    # ---- 會員首次充值金額（用於資金修正→彩金識別）----
     first_dep = {}
-    for _d, _dep, _wd, _mid in cash.values():
-        if _dep > 0 and _mid:
-            cur = first_dep.get(_mid)
-            if cur is None or _d < cur[0]:
-                first_dep[_mid] = (_d, _dep)
+    for mid, dep_date, dep_amt in conn.execute(
+        "SELECT member_id, MIN(charge_date), amount FROM charges "
+        "WHERE type='充值' AND amount>0 AND member_id != '' GROUP BY member_id"
+    ):
+        first_dep[mid] = (dep_date, dep_amt)
 
-    # 手動派發活動彩金（資金修正→新人首充100%豪礼）
+    # ---- 手動派發活動彩金（資金修正→新人首充100%豪礼）----
     _MANUAL_ACT_KEY = ("充值活动", "2075493545907064832")
-    _manual_bonus = {}  # 日 -> 累計 {触发,到帐,次数,触发人数,领取人数}
+    _manual_bonus = {}
 
-    for d, t, amt, mid in ledger.values():
-        if not d:
-            continue
-        a = _rev(d)
-        if "返水" in t:                                   # 返水 / 遊戲返水 / 游戏返水
-            a[3] += amt
+    for d, t, amt, mid in conn.execute(
+        "SELECT change_date, raw_type, amount, member_id FROM changes "
+        "WHERE change_date != '' ORDER BY change_date"
+    ):
+        a = rev.setdefault(d, [0.0, 0.0, 0.0, 0.0, 0.0, set(), 0.0, 0])
+        if "返水" in t:
+            a[3] += round(amt or 0, 2)
         elif "资金修正" in t and mid:
-            # 新人首充100%豪礼手動派發：資金修正金額=首次充值金額
             fc = first_dep.get(mid)
-            if fc and abs(amt - fc[1]) < 0.01 and d >= fc[0]:
-                a[4] += amt
-                # 同時注入活動彩金快照
+            if fc and abs(round(amt or 0, 2) - fc[1]) < 0.01 and d >= fc[0]:
+                a[4] += round(amt or 0, 2)
                 acc = _manual_bonus.setdefault(d, {"触发": 0.0, "到帐": 0.0,
                       "次数": 0, "触发人数": set(), "领取人数": set()})
-                acc["触发"] += amt
-                acc["到帐"] += amt
+                acc["触发"] += round(amt or 0, 2)
+                acc["到帐"] += round(amt or 0, 2)
                 acc["次数"] += 1
                 acc["触发人数"].add(mid)
                 acc["领取人数"].add(mid)
-        elif any(w in t for w in ("活动", "活動", "彩金", "奖励", "獎勵")):  # 彩金 / 活動獎勵
-            a[4] += amt
+        elif any(w in t for w in ("活动", "活動", "彩金", "奖励", "獎勵")):
+            a[4] += round(amt or 0, 2)
 
-    for d, dep, wd, mid in cash.values():
-        if not d:
-            continue
-        a = _cp(d)
-        if dep > 0:
-            a[0] += dep; a[1] += 1; a[2].add(mid)
-        if wd > 0:
-            a[3] += wd; a[4] += 1; a[5].add(mid)
+    # ---- 活动彩金快照（从 SQLite activities 表读取）----
+    activity_snaps = {}
+    for snap, nm, aid, trig, cred, times, tm, cm, rate in conn.execute(
+        "SELECT snapshot_date, activity_name, activity_id, triggered, credited, "
+        "times, triggered_members, claimed_members, claim_rate "
+        "FROM activities ORDER BY snapshot_date"
+    ):
+        m = activity_snaps.setdefault(snap, {})
+        m[(nm, aid)] = {
+            "触发": trig, "到帐": cred, "次数": times,
+            "触发人数": tm, "领取人数": cm, "领取率": rate,
+        }
 
-    # 將手動派發彩金合併到活動快照
+    # ---- 合併手動派發彩金到活動快照 ----
     if _manual_bonus:
         prev_snaps = sorted(activity_snaps.keys())
         for d in sorted(_manual_bonus.keys()):
             m = activity_snaps.setdefault(d, {})
-            # 從前一個快照複製所有活動（累計值）
             if prev_snaps:
                 prev_d = None
                 for sd in prev_snaps:
@@ -343,33 +412,33 @@ def aggregate(source, activity_source=None, base=None, only_keys=None):
                              if (cur.get("触发人数", 0) + len(acc["触发人数"])) else 0.0,
             }
 
-    # ---- 二次充值会员：会员ID -> 累積充值次數，取第二次充值日 ----
-    from collections import defaultdict as _dd
+    # ---- 二次充值会员 ----
     member_dep_days = _dd(set)
-    for _d, _dep, _wd, _mid in cash.values():
-        if _dep > 0:
-            member_dep_days[_mid].add(_d)
+    for charge_date, dep_amt, mid in conn.execute(
+        "SELECT charge_date, amount, member_id FROM charges "
+        "WHERE type='充值' AND amount>0 AND member_id != ''"
+    ):
+        member_dep_days[mid].add(charge_date)
     sc_by_day = {}
-    for _mid, _days in member_dep_days.items():
-        sd = sorted(_days)
+    for mid, days in member_dep_days.items():
+        sd = sorted(days)
         if len(sd) >= 2:
             sc_by_day[sd[1]] = sc_by_day.get(sd[1], 0) + 1
 
     # ---- 会员快照：每日新增注册 / 首充 / 累计注册 ----
-    reg_by_day = {}     # 日 -> 当日注册数
-    fc_by_day = {}      # 日 -> 当日首充会员数
-    firstcharge = {}    # 会员ID -> 首充日（首充留存同期群）
-    regdate = {}        # 会员ID -> 注册日（注册留存同期群）
-    if member_map:
-        for mid, row in member_map.items():
-            rd = daypart(row.get("注册日期时间"))
-            if rd:
-                reg_by_day[rd] = reg_by_day.get(rd, 0) + 1
-                regdate[mid] = rd
-            fd = daypart(row.get("第一次充值成功的日期时间"))
-            if fd:
-                fc_by_day[fd] = fc_by_day.get(fd, 0) + 1
-                firstcharge[mid] = fd
+    reg_by_day = {}
+    fc_by_day = {}
+    firstcharge = {}
+    regdate = {}
+    for mid, rd, fd in conn.execute(
+        "SELECT member_id, register_date, first_deposit_date FROM members"
+    ):
+        if rd:
+            reg_by_day[rd] = reg_by_day.get(rd, 0) + 1
+            regdate[mid] = rd
+        if fd:
+            fc_by_day[fd] = fc_by_day.get(fd, 0) + 1
+            firstcharge[mid] = fd
 
     # 全部出现过的运营日
     days = sorted(set(rev) | set(cp))
@@ -449,15 +518,17 @@ def aggregate(source, activity_source=None, base=None, only_keys=None):
         }
 
     # ---- 会员留存（D1-14，经典第N日 · 充值/提现/下注任一 · 全期合并）----
-    # 双口径：首充同期群 + 注册同期群
-    active_days = {}            # 会员ID -> set(有活动日：投注 / 充值 / 提现)
-    for d2, mid, *_ in bets.values():
-        if d2:
-            active_days.setdefault(mid, set()).add(d2)          # 下注
-    for d2, dep, wd, mid in cash.values():
-        if d2 and (dep > 0 or wd > 0):
-            active_days.setdefault(mid, set()).add(d2)          # 充值 / 提现
-    covered = set(days)         # 覆盖天数 = 运营日（含注单+充提）
+    active_days = {}
+    for mid, d2 in conn.execute(
+        "SELECT DISTINCT member_id, bet_date FROM bets WHERE bet_date != '' AND member_id != ''"
+    ):
+        active_days.setdefault(mid, set()).add(d2)
+    for mid, d2 in conn.execute(
+        "SELECT DISTINCT member_id, charge_date FROM charges "
+        "WHERE charge_date != '' AND member_id != '' AND amount > 0"
+    ):
+        active_days.setdefault(mid, set()).add(d2)
+    covered = set(days)
     out["_meta"] = {
         "retention": {
             "首充": _retention(firstcharge, active_days, covered, max_n=14),
@@ -468,11 +539,7 @@ def aggregate(source, activity_source=None, base=None, only_keys=None):
         "首充会员数": len(firstcharge),
         "注册会员数": len(regdate),
     }
-    intermediate = {
-        "bets": bets, "ledger": ledger, "cash": cash,
-        "member_map": member_map, "activity_snaps": activity_snaps,
-    }
-    return out, intermediate
+    return out, base if isinstance(base, str) else ":memory:"
 
 
 def _monthly_stats(days, rev, cp, reg_by_day, fc_by_day, today_ym=None):

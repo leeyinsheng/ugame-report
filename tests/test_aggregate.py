@@ -366,3 +366,182 @@ class TestDaypart:
     def test_invalid(self):
         assert daypart("") == ""
         assert daypart("abc") == ""
+
+
+import io
+import sys
+sys.path.insert(0, "Dashboard")
+from aggregate import aggregate
+
+
+def _csv_source(*files):
+    """Mock source: files = [(name, content_string), ...]"""
+
+    class MockSource:
+        def iter_csv(self, only_keys=None):
+            for name, content in files:
+                if only_keys and name not in only_keys:
+                    continue
+                yield name, 0, io.StringIO(content)
+
+    return MockSource()
+
+
+BET_CSV = """派彩日期时间,本平台单号,会员ID,投注金额,有效投注,派彩金额,返水,游戏场馆
+2026-06-22 10:00:00,B001,u1,100,80,90,2,PG
+2026-06-22 11:00:00,B002,u2,200,160,180,4,JILI Slots
+2026-06-23 09:00:00,B003,u3,300,240,270,6,PG
+"""
+
+LEDGER_CSV = """流水号,账变时间,账变类型,账变金额,会员ID
+L1,2026-06-22 12:00:00,游戏返水,2,u1
+L2,2026-06-22 13:00:00,活動獎勵,3,u1
+L3,2026-06-23 10:00:00,游戏返水,4,u3
+L4,2026-06-23 11:00:00,活動獎勵,6,u3
+"""
+
+CHARGES_CSV = """订单号,完成时间,类型,充值金额,提现金额,订单状态,会员ID
+C1,2026-06-22 08:00:00,充值,50,0,成功,u1
+C2,2026-06-22 09:00:00,提现,0,10,成功,u1
+C3,2026-06-23 07:00:00,充值,70,0,成功,u4
+"""
+
+MEMBERS_CSV = """会员ID,注册日期时间,第一次充值成功的日期时间
+u1,2026-06-22 00:00:00,2026-06-22 00:00:00
+u2,2026-06-22 00:00:00,
+u3,2026-06-23 00:00:00,2026-06-23 00:00:00
+u4,2026-06-23 00:00:00,2026-06-23 00:00:00
+"""
+
+ACT_CSV = """活动名称,活动 ID,触发彩金总金额,到帐彩金总金额,触发彩金总次数,触发会员总人数,领取彩金会员总人数,活动领取率
+每日充值回馈,2064338446452465664,100,80,10,5,4,80.0
+"""
+
+
+class TestAggregateSqlite:
+    def test_basic_daily_aggregation(self):
+        src = _csv_source(
+            ("bets.csv", BET_CSV),
+            ("ledger.csv", LEDGER_CSV),
+            ("charges.csv", CHARGES_CSV),
+            ("members.csv", MEMBERS_CSV),
+        )
+        out, _ = aggregate(src)
+        assert "2026-06-22" in out
+        assert "2026-06-23" in out
+
+        d22 = out["2026-06-22"]
+        assert d22["rev"]["投注总额"] == 300.0
+        assert d22["rev"]["有效打码"] == 240.0
+        assert d22["rev"]["派彩总额"] == 270.0
+        assert d22["rev"]["GGR"] == 30.0
+        assert d22["rev"]["彩金"] == 3.0
+        assert d22["rev"]["实际返水"] == 2.0
+        assert d22["rev"]["预计返水"] == 6.0
+        assert d22["rev"]["注单量"] == 2
+        assert d22["mem"]["活跃会员"] == 2  # u1, u2
+        assert d22["cp"]["充值总额"] == 50.0
+        assert d22["cp"]["提现总额"] == 10.0
+
+        d23 = out["2026-06-23"]
+        assert d23["rev"]["投注总额"] == 300.0
+        assert d23["rev"]["GGR"] == 30.0
+        assert d23["rev"]["彩金"] == 6.0
+        assert d23["rev"]["实际返水"] == 4.0
+
+    def test_no_duplicate_on_reimport(self):
+        src = _csv_source(("bets.csv", BET_CSV))
+        out1, _ = aggregate(src)
+        # Re-import same data
+        src2 = _csv_source(("bets.csv", BET_CSV))
+        out2, _ = aggregate(src2)
+        assert out1["2026-06-22"]["rev"]["投注总额"] == out2["2026-06-22"]["rev"]["投注总额"]
+        assert out1["2026-06-22"]["rev"]["注单量"] == out2["2026-06-22"]["rev"]["注单量"]
+
+    def test_incremental_only_new_files(self):
+        src = _csv_source(("bets.csv", BET_CSV))
+        out1, _ = aggregate(src)
+        assert out1["2026-06-22"]["rev"]["注单量"] == 2
+
+        more_bets = """派彩日期时间,本平台单号,会员ID,投注金额,有效投注,派彩金额,返水,游戏场馆
+2026-06-24 10:00:00,B004,u5,400,320,360,8,WG
+"""
+        src2 = _csv_source(("bets.csv", BET_CSV), ("bets_new.csv", more_bets))
+        out2, _ = aggregate(src2)
+        assert "2026-06-24" in out2
+        assert out2["2026-06-24"]["rev"]["投注总额"] == 400.0
+
+    def test_monthly_stats_from_sqlite(self):
+        src = _csv_source(
+            ("bets.csv", BET_CSV),
+            ("ledger.csv", LEDGER_CSV),
+            ("charges.csv", CHARGES_CSV),
+            ("members.csv", MEMBERS_CSV),
+        )
+        out, _ = aggregate(src)
+        monthly = out["_meta"]["monthly"]
+        assert len(monthly) == 1
+        jun = monthly[0]
+        assert jun["月份"] == "2026-06"
+        assert jun["投注总额"] == 600.0
+        assert jun["有效打码"] == 480.0
+        assert jun["GGR"] == 60.0
+        assert jun["到帐彩金"] == 9.0
+        assert jun["实际返水"] == 6.0
+        assert jun["活跃会员"] == 3  # u1,u2,u3 deduped
+        assert jun["新增注册"] == 4  # u1,u2,u3,u4
+        assert jun["首充会员"] == 3  # u1,u3,u4
+
+    def test_weekly_stats_from_sqlite(self):
+        src = _csv_source(
+            ("bets.csv", BET_CSV),
+            ("ledger.csv", LEDGER_CSV),
+            ("charges.csv", CHARGES_CSV),
+            ("members.csv", MEMBERS_CSV),
+        )
+        out, _ = aggregate(src)
+        weekly = out["_meta"]["weekly"]
+        assert len(weekly) == 1
+        wk = weekly[0]
+        assert wk["投注总额"] == 600.0
+        assert wk["GGR"] == 60.0
+        assert wk["到帐彩金"] == 9.0
+        assert wk["实际返水"] == 6.0
+        assert wk["活跃会员"] == 3
+
+    def test_activity_bonus_from_sqlite(self):
+        src = _csv_source(
+            ("2026-06-22_活动.csv", ACT_CSV),
+            ("bets.csv", BET_CSV),
+            ("charges.csv", CHARGES_CSV),
+        )
+        out, _ = aggregate(src)
+        bonus = out["2026-06-22"]["bonus"]
+        assert bonus is not None
+        assert bonus["as_of"] == "2026-06-22"
+        assert len(bonus["list"]) == 1
+        assert bonus["list"][0]["活动"] == "每日充值回馈"
+        assert bonus["list"][0]["到帐彩金"] == 80.0
+
+    def test_empty_source(self):
+        src = _csv_source()
+        out, _ = aggregate(src)
+        assert "_meta" in out
+        assert out["_meta"]["monthly"] == []
+        assert out["_meta"]["weekly"] == []
+
+    def test_game_venue_top(self):
+        src = _csv_source(("bets.csv", BET_CSV))
+        out, _ = aggregate(src)
+        games = out["2026-06-22"]["game"]
+        assert len(games) == 2
+        assert games[0]["场馆"] == "JILI 电子"
+        assert games[0]["投注总额"] == 200.0
+        assert games[1]["场馆"] == "PG 电子"
+
+    def test_loadable_module(self):
+        """Smoke test: the module can be loaded without error."""
+        import aggregate as _ag
+        assert hasattr(_ag, "aggregate")
+        assert hasattr(_ag, "_init_schema")
+        assert hasattr(_ag, "_import_csv")

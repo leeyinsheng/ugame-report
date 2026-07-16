@@ -28,7 +28,7 @@ RestartSec=3
 EnvironmentFile=/opt/ugame-dashboard/.env
 # —— 加固（可选）——
 NoNewPrivileges=true
-ProtectSystem=strict
+ProtectSystem=full
 ProtectHome=true
 PrivateTmp=true
 
