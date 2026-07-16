@@ -75,6 +75,7 @@ def _load_state():
 
 
 def _save_state(state):
+    os.makedirs(CACHE_DIR, exist_ok=True)
     with open(CACHE_FILE, "wb") as f:
         pickle.dump(state, f, pickle.HIGHEST_PROTOCOL)
 
@@ -95,6 +96,10 @@ def get_summary():
     curr_files = _build_file_map(SOURCE)
     state = _load_state()
 
+    if not state or not state.get("files"):
+        if os.path.exists(DB_PATH):
+            os.remove(DB_PATH)
+
     if state and state.get("files") == curr_files:
         return state["data"]
 
@@ -109,7 +114,7 @@ def get_summary():
         if not new_keys:
             new_keys = None
 
-    data, _ = aggregate(SOURCE, ACTIVITY_SOURCE, base=DB_PATH, only_keys=new_keys)
+    data, _ = aggregate.aggregate(SOURCE, ACTIVITY_SOURCE, base=DB_PATH, only_keys=new_keys)
     _save_state({"files": curr_files, "data": data})
     return data
 
@@ -164,7 +169,8 @@ class Handler(BaseHTTPRequestHandler):
             self._send(200, f.read(), ctype)
 
     def log_message(self, *a):   # 静默普通日志
-        pass
+        if self.headers.get("X-Debug"):
+            super().log_message(*a)
 
 
 def main():

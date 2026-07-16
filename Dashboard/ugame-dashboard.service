@@ -28,7 +28,8 @@ RestartSec=3
 EnvironmentFile=/opt/ugame-dashboard/.env
 # —— 加固（可选）——
 NoNewPrivileges=true
-ProtectSystem=full
+ReadWritePaths=/usr/local/src/Dashboard/
+ProtectSystem=strict
 ProtectHome=true
 PrivateTmp=true
 

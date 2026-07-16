@@ -279,7 +279,7 @@ def aggregate(source, activity_source=None, base=None, only_keys=None):
 
     if isinstance(base, sqlite3.Connection):
         conn = base
-    elif isinstance(base, str) and base != ":memory:" and os.path.exists(base):
+    elif isinstance(base, str):
         conn = sqlite3.connect(base)
     else:
         conn = sqlite3.connect(":memory:")
