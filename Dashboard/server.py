@@ -96,9 +96,17 @@ def get_summary():
     curr_files = _build_file_map(SOURCE)
     state = _load_state()
 
+    # Fast path: JSON cache hit
     if state and state.get("files") == curr_files:
         return state["data"]
 
+    # 无状态时优先用既有 DB（跳过 OSS 重载）
+    if not state and os.path.exists(DB_PATH):
+        data, _ = aggregate.aggregate(SOURCE, ACTIVITY_SOURCE, base=DB_PATH, only_keys=set())
+        _save_state({"files": curr_files, "data": data})
+        return data
+
+    # 有新文件时只下载新文件
     new_keys = None
     if state and state.get("files"):
         prev_files = state["files"]

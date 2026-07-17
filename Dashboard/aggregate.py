@@ -395,7 +395,7 @@ def aggregate(source, activity_source=None, base=None, only_keys=None):
         "WHERE change_date != '' ORDER BY change_date"
     ):
         a = rev.setdefault(d, [0.0, 0.0, 0.0, 0.0, 0.0, set(), 0.0, 0])
-        if "返水" in t:
+        if t == "返水":
             a[3] += round(amt or 0, 2)
         elif "资金修正" in t and mid:
             # 新用户二存：備注含关键字
