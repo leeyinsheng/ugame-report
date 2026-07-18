@@ -396,32 +396,32 @@ def aggregate(source, activity_source=None, base=None, only_keys=None):
     ):
         a = rev.setdefault(d, [0.0, 0.0, 0.0, 0.0, 0.0, set(), 0.0, 0])
         if t == "返水":
-            a[3] += round(amt or 0, 2)
+            a[3] += amt or 0
         elif "资金修正" in t and mid:
             # 新用户二存：備注含关键字
             if "新用户二存专属福利" in (remark or ""):
-                a[4] += round(amt or 0, 2)
+                a[4] += amt or 0
                 acc = _manual_bonus_2.setdefault(d, {"触发": 0.0, "到帐": 0.0,
                       "次数": 0, "触发人数": set(), "领取人数": set()})
-                acc["触发"] += round(amt or 0, 2)
-                acc["到帐"] += round(amt or 0, 2)
+                acc["触发"] += amt or 0
+                acc["到帐"] += amt or 0
                 acc["次数"] += 1
                 acc["触发人数"].add(mid)
                 acc["领取人数"].add(mid)
             else:
                 # 新人首充：金額匹配首次充值
                 fc = first_dep.get(mid)
-                if fc and abs(round(amt or 0, 2) - fc[1]) < 0.01 and d >= fc[0]:
-                    a[4] += round(amt or 0, 2)
+                if fc and abs((amt or 0) - fc[1]) < 0.01 and d >= fc[0]:
+                    a[4] += amt or 0
                     acc = _manual_bonus.setdefault(d, {"触发": 0.0, "到帐": 0.0,
                           "次数": 0, "触发人数": set(), "领取人数": set()})
-                    acc["触发"] += round(amt or 0, 2)
-                    acc["到帐"] += round(amt or 0, 2)
+                    acc["触发"] += amt or 0
+                    acc["到帐"] += amt or 0
                     acc["次数"] += 1
                     acc["触发人数"].add(mid)
                     acc["领取人数"].add(mid)
         elif any(w in t for w in ("活动", "活動", "彩金", "奖励", "獎勵")):
-            a[4] += round(amt or 0, 2)
+            a[4] += amt or 0
 
     # ---- 活动彩金快照（从 SQLite activities 表读取）----
     activity_snaps = {}
