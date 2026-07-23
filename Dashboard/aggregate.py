@@ -400,8 +400,9 @@ def aggregate(source, activity_source=None, base=None, only_keys=None):
         "WHERE change_date != '' ORDER BY change_date"
     ):
         a = rev.setdefault(d, [0.0, 0.0, 0.0, 0.0, 0.0, set(), 0.0, 0])
+        am = amt or 0
         if t == "返水":
-            a[3] += amt or 0
+            a[3] += am
         elif "资金修正" in t and mid:
             # ---- 資金修正 → 活動彩金匹配 ----
             act_key = None
@@ -418,7 +419,6 @@ def aggregate(source, activity_source=None, base=None, only_keys=None):
             # 2) 比例回退
             if act_key is None:
                 deps = dep_history.get(mid, [])
-                am = amt or 0
                 if len(deps) >= 1 and abs(am - deps[0] * 0.5) < 0.01:
                     act_key = _ACT_KEY_SC50
                 elif len(deps) >= 2 and abs(am - deps[1] * 0.8) < 0.01:
@@ -431,16 +431,16 @@ def aggregate(source, activity_source=None, base=None, only_keys=None):
                         act_key = _ACT_KEY_OLD
 
             if act_key:
-                a[4] += am or 0
+                a[4] += am
                 acc = _manual[act_key].setdefault(d, {"触发": 0.0, "到帐": 0.0,
                       "次数": 0, "触发人数": set(), "领取人数": set()})
-                acc["触发"] += am or 0
-                acc["到帐"] += am or 0
+                acc["触发"] += am
+                acc["到帐"] += am
                 acc["次数"] += 1
                 acc["触发人数"].add(mid)
                 acc["领取人数"].add(mid)
         elif any(w in t for w in ("活动", "活動", "彩金", "奖励", "獎勵")):
-            a[4] += amt or 0
+            a[4] += am
 
     # ---- 活动彩金快照（从 SQLite activities 表读取）----
     activity_snaps = {}
