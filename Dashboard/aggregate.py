@@ -390,10 +390,11 @@ def aggregate(source, activity_source=None, base=None, only_keys=None):
     # ---- 手動派發活動彩金 ----
     _ACT_KEY_OLD   = ("充值活动", "2075493545907064832")
     _ACT_KEY_2ND   = ("充值活动", "2077719965773901824")
+    _ACT_KEY_GIFT  = ("充值活动", "2079196727994417152")
     _ACT_KEY_SC50  = ("充值活动", "2079876950897393664")
     _ACT_KEY_EC80  = ("充值活动", "2079878244573728768")
     _ACT_KEY_SC100 = ("充值活动", "2079879479186096128")
-    _manual = {k: {} for k in [_ACT_KEY_OLD, _ACT_KEY_2ND, _ACT_KEY_SC50, _ACT_KEY_EC80, _ACT_KEY_SC100]}
+    _manual = {k: {} for k in [_ACT_KEY_OLD, _ACT_KEY_2ND, _ACT_KEY_GIFT, _ACT_KEY_SC50, _ACT_KEY_EC80, _ACT_KEY_SC100]}
 
     for d, t, amt, mid, remark in conn.execute(
         "SELECT change_date, raw_type, amount, member_id, remark FROM changes "
@@ -416,6 +417,8 @@ def aggregate(source, activity_source=None, base=None, only_keys=None):
                 act_key = _ACT_KEY_SC100
             elif "新用户二存专属福利" in r:
                 act_key = _ACT_KEY_2ND
+            elif "充值成长礼" in r:
+                act_key = _ACT_KEY_GIFT
             # 2) 比例回退
             if act_key is None:
                 deps = dep_history.get(mid, [])
@@ -814,6 +817,7 @@ KNOWN_ACTIVITY_NAMES = {
     ("充值活动", "2075493545907064832"): "新人首充100%豪礼",
     ("充值活动", "2077707210970935296"): "电子狂欢",
     ("充值活动", "2077719965773901824"): "新用户二存专属福利",
+    ("充值活动", "2079196727994417152"): "充值成长礼",
     ("充值活动", "2079876950897393664"): "新人专属·首充50%彩金",
     ("充值活动", "2079878244573728768"): "新人专属·二充80%彩金",
     ("充值活动", "2079879479186096128"): "新人专属·三存100%彩金",
